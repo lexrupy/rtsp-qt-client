@@ -13,6 +13,7 @@ from qtcompat import (
     QApplication,
     QDrag,
     QMimeData,
+    QSizePolicy_Expanding,
     QWidget,
     QGridLayout,
     QHBoxLayout,
@@ -39,6 +40,7 @@ from qtcompat import (
     QImage_Format_RGB888,
     QT_COMPAT_VERSION,
     QT_VERSION_STR,
+    QWIDGETSIZE_MAX,
 )
 
 
@@ -144,13 +146,13 @@ class CameraThread(QThread):
             f"rtspsrc location={self.url} latency=0 ! "
             "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
         )
-        cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
-        if not cap.isOpened():
+        self.cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
+        if not self.cap.isOpened():
             self.connection_failed.emit()
             return
 
         while self.running:
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if not ret:
                 time.sleep(0.01)
                 continue
@@ -160,10 +162,12 @@ class CameraThread(QThread):
             image = QImage(rgb.data, w, h, bytesPerLine, QImage_Format_RGB888)
             self.frame_ready.emit(image)
 
-        cap.release()
+        self.cap.release()
 
     def stop(self):
         self.running = False
+        if hasattr(self, "cap") and self.cap.isOpened():
+            self.cap.release()
         self.wait()
 
 
@@ -174,7 +178,9 @@ class CameraViewer(QLabel):
         self.url_low = url_low if url_low else ""
         self.url_high = url_high if url_high else ""
         self.setScaledContents(True)
+        self.setMinimumSize(0, 0)
         self.setAlignment(Qt_AlignmentFlag_AlignCenter)
+        self.setSizePolicy(QSizePolicy_Expanding, QSizePolicy_Expanding)
         self.setText("Conectando...")
         self.setStyleSheet("background-color: black; color: white; font-size: 16px;")
         self.last_esc_time = 0
@@ -216,6 +222,9 @@ class CameraViewer(QLabel):
     def close(self):
         if self.thread:
             self.thread.stop()
+            self.thread.wait()
+            self.thread = None
+        super().close()
 
     def mouseDoubleClickEvent(self, event):
         self.parent().toggle_fullscreen(self)
@@ -249,6 +258,11 @@ class CameraViewer(QLabel):
             drag.setMimeData(mime)
             drag.exec(Qt_MoveAction)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update()
+        self.updateGeometry()
+
 
 class MosaicoRTSP(QWidget):
     def __init__(self):
@@ -256,7 +270,8 @@ class MosaicoRTSP(QWidget):
         self.cameras = []
         self.config = configparser.ConfigParser()
         self.load_config()
-
+        self.setMinimumSize(600, 408)
+        self.setSizePolicy(QSizePolicy_Expanding, QSizePolicy_Expanding)
         self.viewers = []
         self._last_esc_time = 0
         self.setWindowTitle("Mosaico RTSP")
@@ -268,9 +283,7 @@ class MosaicoRTSP(QWidget):
         self.fullscreen_mode = False
         self.original_positions = {}
         self.current_fullscreen = None
-
         self.selected_viewer = None
-
         self.reload_cameras()
 
     def show_about_dialog(self):
@@ -330,9 +343,8 @@ class MosaicoRTSP(QWidget):
 
     def toggle_fullscreen(self, viewer):
         if not self.fullscreen_mode:
-            # Armazena posições antes de modificar
             self.original_positions = {
-                v: (self.layout.getItemPosition(self.layout.indexOf(v))[:2])
+                v: self.layout.getItemPosition(self.layout.indexOf(v))[:2]
                 for v in self.viewers
             }
 
@@ -346,10 +358,12 @@ class MosaicoRTSP(QWidget):
             self.fullscreen_mode = True
             self.current_fullscreen = viewer
 
-        else:
-            viewer.change_res(1)
+            viewer.show()
+            viewer.update()
 
-            # Limpa o layout antes de restaurar os viewers
+        else:
+            self.setMaximumSize(self.size())
+            viewer.change_res(1)
             self.clear_layout()
 
             for v in self.viewers:
@@ -357,9 +371,17 @@ class MosaicoRTSP(QWidget):
                 if v in self.original_positions:
                     r, c = self.original_positions[v]
                     self.layout.addWidget(v, r, c)
+                v.update()
+
+            self.layout.invalidate()
+            self.layout.activate()
+            self.updateGeometry()
+            self.adjustSize()
+            self.resize(self.sizeHint())
 
             self.fullscreen_mode = False
             self.current_fullscreen = None
+            self.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
 
     def clear_layout(self):
         while self.layout.count():
@@ -419,6 +441,8 @@ class MosaicoRTSP(QWidget):
             col = i % self.cols
             self.layout.addWidget(viewer, row, col)
             self.original_positions[viewer] = (row, col)
+
+        self.adjustSize()
 
     def show_no_camera_widget(self):
         # Limpa o grid
@@ -484,9 +508,6 @@ class MosaicoRTSP(QWidget):
 
     def closeEvent(self, event):
         for viewer in self.viewers:
-            if viewer.thread:
-                viewer.thread.stop()
-                viewer.thread.wait()
             viewer.close()
         event.accept()
 
