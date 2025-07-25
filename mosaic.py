@@ -548,37 +548,34 @@ class MosaicoRTSP(QWidget):
 
     def load_config(self):
         self.cameras.clear()
-        if os.path.exists(CONFIG_FILE):
-            self.config.read(CONFIG_FILE)
-            if "Cameras" in self.config and "order" in self.config["Cameras"]:
-                cameras_str = self.config["Cameras"]["order"]
-                cam_ids = list(map(int, cameras_str.split(",")))
-                for cam_id in cam_ids:
-                    section = f"Camera{cam_id}"
-                    if self.config.has_section(section):
-                        url_low = self.config.get(section, "url_low", fallback=None)
-                        url_high = self.config.get(section, "url_high", fallback=None)
-                        if url_low and url_high:
-                            # Monte seu objeto de câmera ou pelo menos um dicionário
-                            self.cameras.append(
-                                {
-                                    "id": cam_id,
-                                    "url_low": url_low,
-                                    "url_high": url_high,
-                                }
-                            )
-                        else:
-                            # URLs faltando, ignore ou trate como desejar
-                            pass
-                    else:
-                        # Seção da câmera não existe, ignore ou trate
-                        pass
-            else:
-                # Configuração vazia, comece com lista vazia
-                self.cameras = []
-        else:
-            # Arquivo config não existe, comece vazio
-            self.cameras = []
+        if not os.path.exists(CONFIG_FILE):
+            return
+
+        self.config.read(CONFIG_FILE)
+        if "Cameras" not in self.config or "order" not in self.config["Cameras"]:
+            return
+
+        cameras_str = self.config["Cameras"]["order"]
+        cam_ids = list(map(int, cameras_str.split(",")))
+
+        for cam_id in cam_ids:
+            section = f"Camera{cam_id}"
+            if not self.config.has_section(section):
+                continue  # Ignora se seção inexistente
+
+            url_low = self.config.get(section, "url_low", fallback=None)
+            url_high = self.config.get(section, "url_high", fallback=None)
+
+            if not url_low or not url_high:
+                continue
+
+            self.cameras.append(
+                {
+                    "id": cam_id,
+                    "url_low": url_low,
+                    "url_high": url_high,
+                }
+            )
 
     def save_config(self):
         if not self.config.has_section("Cameras"):
