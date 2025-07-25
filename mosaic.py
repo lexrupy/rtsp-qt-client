@@ -231,10 +231,25 @@ class CameraViewer(QLabel):
         self.set_url(new_url)
 
     def reconnect(self):
+        if self.reconnecting:
+            return  # evita reconectar várias vezes ao mesmo tempo
+        self.reconnecting = True
         if self.thread:
+            self.thread.stopped.connect(self._do_reconnect)
             self.thread.stop()
-            self.thread.wait()
+        else:
+            self._do_reconnect()
+
+    def _do_reconnect(self):
+        # desconectar para evitar chamadas repetidas
+        if self.thread:
+            try:
+                self.thread.stopped.disconnect(self._do_reconnect)
+            except Exception:
+                pass
+            self.thread = None
         self.init_capture()
+        self.reconnecting = False
 
     def set_url(self, new_url):
         if not new_url or new_url == self.current_url:
