@@ -46,6 +46,7 @@ from qtcompat import (
     Qt_Compat_GetMousePoint,
     QImage_Format_RGB888,
     QT_COMPAT_VERSION,
+    QT_VERSION_STR,
 )
 
 
@@ -75,8 +76,15 @@ class AboutDialog(QDialog):
             )
             icon_label.setAlignment(Qt_AlignmentFlag_AlignCenter)
             layout.addWidget(icon_label)
-
-        app_info = QLabel("Mosaico RTSP\nVersão 1.0\n© 2025 Alexandre")
+        app_info = QLabel(
+            f"""
+        <h2 style='margin: 4px;'>Mosaico RTSP</h2>
+        <p>Aplicativo para exibição simultânea de múltiplas câmeras via RTSP.</p>
+        <p><b>Versão do Qt:</b> {QT_VERSION_STR}</p>
+        <p>Desenvolvido por Alexandre - {os.uname().nodename}</p>
+        """
+        )
+        # app_info = QLabel("Mosaico RTSP\nVersão 1.0\n© 2025 Alexandre")
         app_info.setAlignment(Qt_AlignmentFlag_AlignCenter)
         layout.addWidget(app_info)
 

@@ -15,7 +15,7 @@ try:
         QSplashScreen,
     )
     from PyQt6.QtGui import QImage, QPixmap, QDrag, QAction
-    from PyQt6.QtCore import QTimer, Qt, QMimeData, QThread, pyqtSignal
+    from PyQt6.QtCore import QTimer, Qt, QMimeData, QThread, pyqtSignal, QT_VERSION_STR
 
     Qt_WindowType_FramelessWindowHint = Qt.WindowType.FramelessWindowHint
     Qt_WindowType_WindowStaysOnTopHint = Qt.WindowType.WindowStaysOnTopHint
@@ -67,7 +67,7 @@ except:
         QSplashScreen,
     )
     from PyQt5.QtGui import QImage, QPixmap, QDrag
-    from PyQt5.QtCore import QTimer, Qt, QMimeData, QThread, pyqtSignal
+    from PyQt5.QtCore import QTimer, Qt, QMimeData, QThread, pyqtSignal, QT_VERSION_STR
 
     Qt_WindowType_FramelessWindowHint = Qt.FramelessWindowHint
     Qt_WindowType_WindowStaysOnTopHint = Qt.WindowStaysOnTopHint
@@ -126,4 +126,5 @@ __all__ = [
     "QMimeData",
     "QThread",
     "pyqtSignal",
+    "QT_VERSION_STR",
 ]
