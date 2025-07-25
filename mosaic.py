@@ -13,6 +13,7 @@ from qtcompat import (
     QApplication,
     QDrag,
     QMimeData,
+    QComboBox,
     QSizePolicy_Expanding,
     QWidget,
     QGridLayout,
@@ -93,12 +94,13 @@ class AboutDialog(QDialog):
 
 
 class AddCameraDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, stream_type="Auto"):
         super().__init__(parent)
         self.setWindowTitle("Adicionar/Editar Câmera")
         self.resize(700, 160)  # Largura x Altura
         self.low_url = ""
         self.high_url = ""
+        self.stream_type = stream_type
 
         layout = QVBoxLayout(self)
 
@@ -109,6 +111,14 @@ class AddCameraDialog(QDialog):
         layout.addWidget(QLabel("URL High Resolution:"))
         self.high_url_edit = QLineEdit(self)
         layout.addWidget(self.high_url_edit)
+
+        layout.addWidget(QLabel("Tipo de captura:"))
+        self.stream_type_combo = QComboBox(self)
+        self.stream_type_combo.addItems(
+            ["Auto", "OpenCV", "GStreamer", "Ffmpeg", "DirectShow", "MSMF"]
+        )
+        self.stream_type_combo.setCurrentText(self.stream_type)
+        layout.addWidget(self.stream_type_combo)
 
         btn_layout = QHBoxLayout()
         self.ok_btn = QPushButton("OK", self)
@@ -128,27 +138,43 @@ class AddCameraDialog(QDialog):
             return
         self.low_url = low_url
         self.high_url = high_url
+        self.stream_type = self.stream_type_combo.currentText()
         super().accept()
 
 
 class CameraThread(QThread):
     frame_ready = pyqtSignal(QImage)
     connection_failed = pyqtSignal()
+    stopped = pyqtSignal()
 
-    def __init__(self, url):
+    def __init__(self, url, stream_type="Auto"):
         super().__init__()
         self.url = url
+        self.stream_type = stream_type
         self.running = True
 
     def run(self):
 
-        gst = (
-            f"rtspsrc location={self.url} latency=0 ! "
-            "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
-        )
-        self.cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
+        if self.stream_type == "GStreamer":
+            gst = (
+                f"rtspsrc location={self.url} latency=0 ! "
+                "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
+            )
+            self.cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
+        elif self.stream_type == "OpenCV":
+            self.cap = cv2.VideoCapture(self.url)
+        elif self.stream_type == "Ffmpeg":
+            self.cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+        elif self.stream_type == "DirectShow":
+            self.cap = cv2.VideoCapture(self.url, cv2.CAP_DSHOW)
+        elif self.stream_type == "MSMF":
+            self.cap = cv2.VideoCapture(self.url, cv2.CAP_MSMF)
+        else:
+            self.cap = cv2.VideoCapture(self.url)
+
         if not self.cap.isOpened():
             self.connection_failed.emit()
+            self.stopped.emit()
             return
 
         while self.running:
@@ -159,10 +185,11 @@ class CameraThread(QThread):
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb.shape
             bytesPerLine = ch * w
-            image = QImage(rgb.data, w, h, bytesPerLine, QImage_Format_RGB888)
+            image = QImage(rgb.data, w, h, bytesPerLine, QImage_Format_RGB888).copy()
             self.frame_ready.emit(image)
 
         self.cap.release()
+        self.stopped.emit()
 
     def stop(self):
         self.running = False
@@ -172,11 +199,13 @@ class CameraThread(QThread):
 
 
 class CameraViewer(QLabel):
-    def __init__(self, camera, url_low=None, url_high=None):
+    def __init__(self, camera, url_low=None, url_high=None, stream_type="Auto"):
         super().__init__()
         self.camera_id = camera
         self.url_low = url_low if url_low else ""
         self.url_high = url_high if url_high else ""
+        self.stream_type = stream_type
+        self.reconnecting = False
         self.setScaledContents(True)
         self.setMinimumSize(0, 0)
         self.setAlignment(Qt_AlignmentFlag_AlignCenter)
@@ -186,10 +215,13 @@ class CameraViewer(QLabel):
         self.last_esc_time = 0
         self.thread = None
         self.current_url = self.url_low
+        self.connecting = False
         self.init_capture()
 
     def init_capture(self):
-        self.thread = CameraThread(self.current_url)
+        self.connecting = True
+        self.setPixmap(QPixmap())  # limpa imagem antiga
+        self.thread = CameraThread(self.current_url, self.stream_type)
         self.thread.frame_ready.connect(self.update_frame)
         self.thread.connection_failed.connect(self.show_connection_error)
         self.thread.start()
@@ -198,16 +230,22 @@ class CameraViewer(QLabel):
         new_url = self.url_high if res == 0 else self.url_low
         self.set_url(new_url)
 
-    def set_url(self, new_url):
-        if not new_url or new_url == self.current_url:
-            return  # Nada a fazer se for a mesma URL
-        self.current_url = new_url
+    def reconnect(self):
         if self.thread:
             self.thread.stop()
             self.thread.wait()
         self.init_capture()
 
+    def set_url(self, new_url):
+        if not new_url or new_url == self.current_url:
+            return  # Nada a fazer se for a mesma URL
+        self.current_url = new_url
+        self.reconnect()
+
     def update_frame(self, img):
+        if self.connecting:
+            self.connecting = False
+            self.setText("")  # esconde texto conectando
         self.setPixmap(
             QPixmap.fromImage(img).scaled(
                 self.size(),
@@ -217,7 +255,9 @@ class CameraViewer(QLabel):
         )
 
     def show_connection_error(self):
+        self.connecting = False
         self.setText("Erro ao conectar")
+        self.setPixmap(QPixmap())  # limpa imagem
 
     def close(self):
         if self.thread:
@@ -295,7 +335,8 @@ class MosaicoRTSP(QWidget):
         if dlg.exec() == QDialog_Accepted:
             low_url = dlg.low_url
             high_url = dlg.high_url
-            self.add_camera_with_urls(low_url, high_url)
+            stream_type = dlg.stream_type
+            self.add_camera_with_urls(low_url, high_url, stream_type)
 
     def copy_camera_dialog(self):
         if not self.selected_viewer:
@@ -306,7 +347,7 @@ class MosaicoRTSP(QWidget):
         if not cam_data:
             return
 
-        dlg = AddCameraDialog(self)
+        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"])
         dlg.low_url_edit.setText(cam_data["url_low"])
         dlg.high_url_edit.setText(cam_data["url_high"])
 
@@ -323,20 +364,26 @@ class MosaicoRTSP(QWidget):
         cam_data = next((c for c in self.cameras if c["id"] == cam_id), None)
         if not cam_data:
             return
-        dlg = AddCameraDialog(self)
+        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"])
         dlg.low_url_edit.setText(cam_data["url_low"])
         dlg.high_url_edit.setText(cam_data["url_high"])
         if dlg.exec() == QDialog_Accepted:
             cam_data["url_low"] = dlg.low_url
             cam_data["url_high"] = dlg.high_url
+            cam_data["stream_type"] = dlg.stream_type
             self.save_config()
             self.reload_cameras()
 
-    def add_camera_with_urls(self, low_url, high_url):
+    def add_camera_with_urls(self, low_url, high_url, stream_type="Auto"):
         # Acha um ID disponível para a nova câmera, ex: o próximo inteiro livre
         new_cam_id = max(cam["id"] for cam in self.cameras) + 1 if self.cameras else 1
         self.cameras.append(
-            {"id": new_cam_id, "url_low": low_url, "url_high": high_url}
+            {
+                "id": new_cam_id,
+                "url_low": low_url,
+                "url_high": high_url,
+                "stream_type": stream_type,
+            }
         )
         self.save_config()
         self.reload_cameras()
@@ -486,26 +533,6 @@ class MosaicoRTSP(QWidget):
         self.reorganize_grid()
         self.save_config()
 
-    def add_camera(self, cam):
-        if cam in self.cameras:
-            return
-        viewer = CameraViewer(cam)
-        viewer.setAcceptDrops(True)
-        self.viewers.append(viewer)
-        self.cameras.append(cam)
-        # recalcula grid
-        count = len(self.cameras)
-        self.cols = int(math.ceil(math.sqrt(count)))
-        self.rows = int(math.ceil(count / self.cols))
-        # adiciona no layout na última posição
-        index = len(self.viewers) - 1
-        row = index // self.cols
-        col = index % self.cols
-        viewer.setAcceptDrops(True)
-        self.layout.addWidget(viewer, row, col)
-        self.original_positions[viewer] = (row, col)
-        self.save_config()
-
     def closeEvent(self, event):
         for viewer in self.viewers:
             viewer.close()
@@ -565,6 +592,7 @@ class MosaicoRTSP(QWidget):
 
             url_low = self.config.get(section, "url_low", fallback=None)
             url_high = self.config.get(section, "url_high", fallback=None)
+            stream_type = self.config.get(section, "stream_type", fallback="GStreamer")
 
             if not url_low or not url_high:
                 continue
@@ -574,6 +602,7 @@ class MosaicoRTSP(QWidget):
                     "id": cam_id,
                     "url_low": url_low,
                     "url_high": url_high,
+                    "stream_type": stream_type,
                 }
             )
 
@@ -592,6 +621,7 @@ class MosaicoRTSP(QWidget):
                 self.config.add_section(section)
             self.config.set(section, "url_low", cam.get("url_low", ""))
             self.config.set(section, "url_high", cam.get("url_high", ""))
+            self.config.set(section, "stream_type", cam.get("stream_type", ""))
 
         config_dir = os.path.dirname(CONFIG_FILE)
         os.makedirs(config_dir, exist_ok=True)
@@ -670,16 +700,22 @@ class MosaicoRTSP(QWidget):
             cam_id = cam["id"]
             cam_url = cam["url_low"]
             cam_url_high = cam.get("url_high", "")
+            stream_type = cam.get("stream_type", "")
 
             viewer = existing_viewers.get(cam_id)
             if viewer:
                 # Reconectar só se a URL mudou
                 if viewer.current_url != cam_url:
                     viewer.set_url(cam_url)
+
+                if viewer.stream_type != stream_type:
+                    viewer.stream_type = stream_type
+                    viewer.reconnect()
+
                 existing_viewers.pop(cam_id)  # Remove da lista de existentes
             else:
                 # Criar novo viewer
-                viewer = CameraViewer(cam_id, cam_url, cam_url_high)
+                viewer = CameraViewer(cam_id, cam_url, cam_url_high, stream_type)
 
             row = index // self.cols
             col = index % self.cols
