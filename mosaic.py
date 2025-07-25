@@ -1,9 +1,6 @@
-#!/bin/env python3
-
 import os
 import math
 import time
-import sys
 import cv2
 import configparser
 
@@ -24,23 +21,18 @@ from qtcompat import (
     QDialog,
     QMenu,
     QAction,
-    QSplashScreen,
     QThread,
     pyqtSignal,
     QMessageBox_No,
     QMessageBox_Yes,
     QDialog_Accepted,
-    Qt_AlignmentFlag_AlignBottom,
     Qt_AlignmentFlag_AlignCenter,
     Qt_AspectRatioMode_KeepAspectRatio,
-    Qt_Color_White,
     Qt_Key_Escape,
     Qt_Key_F,
     Qt_Key_F11,
     Qt_KeyModifier_Control,
     Qt_TransformationMode_SmoothTransformation,
-    Qt_WindowType_FramelessWindowHint,
-    Qt_WindowType_WindowStaysOnTopHint,
     Qt_LeftButton,
     Qt_MoveAction,
     Qt_Compat_GetMousePoint,
@@ -329,7 +321,6 @@ class MosaicoRTSP(QWidget):
 
     def add_camera_with_urls(self, low_url, high_url):
         # Acha um ID disponível para a nova câmera, ex: o próximo inteiro livre
-        # new_cam_id = max(self.cameras) + 1 if self.cameras else 1
         new_cam_id = max(cam["id"] for cam in self.cameras) + 1 if self.cameras else 1
         self.cameras.append(
             {"id": new_cam_id, "url_low": low_url, "url_high": high_url}
@@ -339,36 +330,45 @@ class MosaicoRTSP(QWidget):
 
     def toggle_fullscreen(self, viewer):
         if not self.fullscreen_mode:
+            # Armazena posições antes de modificar
+            self.original_positions = {
+                v: (self.layout.getItemPosition(self.layout.indexOf(v))[:2])
+                for v in self.viewers
+            }
+
             for v in self.viewers:
                 if v != viewer:
                     v.hide()
+
             viewer.change_res(0)
+            self.clear_layout()
             self.layout.addWidget(viewer, 0, 0, self.rows, self.cols)
             self.fullscreen_mode = True
             self.current_fullscreen = viewer
+
         else:
             viewer.change_res(1)
+
+            # Limpa o layout antes de restaurar os viewers
+            self.clear_layout()
+
             for v in self.viewers:
                 v.show()
-            for v, (r, c) in self.original_positions.items():
-                self.layout.addWidget(v, r, c)
+                if v in self.original_positions:
+                    r, c = self.original_positions[v]
+                    self.layout.addWidget(v, r, c)
+
             self.fullscreen_mode = False
             self.current_fullscreen = None
 
+    def clear_layout(self):
+        while self.layout.count():
+            item = self.layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                self.layout.removeWidget(widget)
+
     def swap_viewers(self, viewer1, viewer2):
-        # r1, c1 = self.original_positions[viewer1]
-        # r2, c2 = self.original_positions[viewer2]
-        #
-        # self.layout.removeWidget(viewer1)
-        # self.layout.removeWidget(viewer2)
-        #
-        # self.layout.addWidget(viewer1, r2, c2)
-        # self.layout.addWidget(viewer2, r1, c1)
-        #
-        # self.original_positions[viewer1], self.original_positions[viewer2] = (r2, c2), (
-        #     r1,
-        #     c1,
-        # )
         r1, c1 = self.original_positions[viewer1]
         r2, c2 = self.original_positions[viewer2]
 
@@ -676,34 +676,3 @@ class MosaicoRTSP(QWidget):
             viewer.close()
             self.layout.removeWidget(viewer)
             viewer.deleteLater()
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-
-    file_path = os.path.realpath(__file__)
-
-    pixmap = QPixmap(os.path.join(os.path.dirname(file_path), "_splashscreen.png"))
-
-    # splash = QSplashScreen(pixmap)
-    splash = QSplashScreen(
-        pixmap, Qt_WindowType_WindowStaysOnTopHint | Qt_WindowType_FramelessWindowHint
-    )
-    splash.showMessage(
-        "Carregando Câmeras...",
-        Qt_AlignmentFlag_AlignBottom | Qt_AlignmentFlag_AlignCenter,
-        Qt_Color_White,
-    )
-    splash.show()
-
-    QApplication.processEvents()
-
-    window = MosaicoRTSP()
-    window.showMaximized()
-
-    splash.finish(window)  # fecha o splash depois que a janela abriu
-    if QT_COMPAT_VERSION == 6:
-        sys.exit(app.exec())
-
-    else:
-        sys.exit(app.exec_())

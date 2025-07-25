@@ -11,6 +11,7 @@ try:
         QMessageBox,
         QInputDialog,
         QDialog,
+        QIcon,
         QMenu,
         QSplashScreen,
     )
@@ -66,7 +67,7 @@ except:
         QAction,
         QSplashScreen,
     )
-    from PyQt5.QtGui import QImage, QPixmap, QDrag
+    from PyQt5.QtGui import QImage, QPixmap, QDrag, QIcon
     from PyQt5.QtCore import QTimer, Qt, QMimeData, QThread, pyqtSignal, QT_VERSION_STR
 
     Qt_WindowType_FramelessWindowHint = Qt.FramelessWindowHint
@@ -107,6 +108,7 @@ __all__ = [
     "QApplication",
     "QWidget",
     "QLabel",
+    "QIcon",
     "QGridLayout",
     "QVBoxLayout",
     "QHBoxLayout",
