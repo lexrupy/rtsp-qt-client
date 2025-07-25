@@ -8,10 +8,6 @@ import cv2
 import configparser
 
 from qtcompat import (
-    QT_COMPAT_VERSION,
-    QMessageBox_No,
-    QMessageBox_Yes,
-    QDialog_Accepted,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -29,6 +25,11 @@ from qtcompat import (
     QMenu,
     QAction,
     QSplashScreen,
+    QThread,
+    pyqtSignal,
+    QMessageBox_No,
+    QMessageBox_Yes,
+    QDialog_Accepted,
     Qt_AlignmentFlag_AlignBottom,
     Qt_AlignmentFlag_AlignCenter,
     Qt_AspectRatioMode_KeepAspectRatio,
@@ -39,27 +40,45 @@ from qtcompat import (
     Qt_KeyModifier_Control,
     Qt_TransformationMode_SmoothTransformation,
     Qt_WindowType_FramelessWindowHint,
-    Qt_WintowType_WindowStaysOnTopHint,
+    Qt_WindowType_WindowStaysOnTopHint,
     Qt_LeftButton,
     Qt_MoveAction,
     Qt_Compat_GetMousePoint,
-    QThread,
-    pyqtSignal,
+    QImage_Format_RGB888,
+    QT_COMPAT_VERSION,
 )
 
-# ALL_CAMERAS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-# DVR_IP = "10.216.62.6"
-# DVR_PORT = "554"
-# RES = 1
+
+CONFIG_FILE = os.path.expanduser("~/.config/rtsp-qt-client/config.ini")
 
 
-CONFIG_FILE = os.path.expanduser("~/.config/cameras-qt/config.ini")
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Sobre o Aplicativo")
+        self.resize(400, 200)
+
+        layout = QVBoxLayout(self)
+
+        app_info = QLabel("Mosaico RTSP\nVersão 1.0\n© 2025 Alexandre")
+        app_info.setAlignment(Qt_AlignmentFlag_AlignCenter)
+        layout.addWidget(app_info)
+
+        qt_version_str = f"Qt Version: {'6' if QT_COMPAT_VERSION == 6 else '5'}"
+        qt_label = QLabel(qt_version_str)
+        qt_label.setAlignment(Qt_AlignmentFlag_AlignCenter)
+        layout.addWidget(qt_label)
+
+        btn_close = QPushButton("Fechar")
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close)
 
 
 class AddCameraDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Adicionar Câmera")
+        self.setWindowTitle("Adicionar/Editar Câmera")
+        self.resize(700, 160)  # Largura x Altura
         self.low_url = ""
         self.high_url = ""
 
@@ -121,7 +140,8 @@ class CameraThread(QThread):
                 continue
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb.shape
-            image = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
+            bytesPerLine = ch * w
+            image = QImage(rgb.data, w, h, bytesPerLine, QImage_Format_RGB888)
             self.frame_ready.emit(image)
 
         cap.release()
@@ -134,14 +154,9 @@ class CameraThread(QThread):
 class CameraViewer(QLabel):
     def __init__(self, camera, url_low=None, url_high=None):
         super().__init__()
-        self.camera = camera
+        self.camera_id = camera
         self.url_low = url_low if url_low else ""
         self.url_high = url_high if url_high else ""
-
-        # super().__init__()
-        # self.url_low = f"rtsp://admin:admin@192.168.1.9:1935"
-        # self.url_high = f"rtsp://admin:admin@192.168.1.9:1935"
-        self.camera = camera
         self.setScaledContents(True)
         self.setAlignment(Qt_AlignmentFlag_AlignCenter)
         self.setText("Conectando...")
@@ -158,13 +173,16 @@ class CameraViewer(QLabel):
         self.thread.start()
 
     def change_res(self, res=0):
+        new_url = self.url_high if res == 0 else self.url_low
+        self.set_url(new_url)
+
+    def set_url(self, new_url):
+        if not new_url or new_url == self.current_url:
+            return  # Nada a fazer se for a mesma URL
+        self.current_url = new_url
         if self.thread:
             self.thread.stop()
-        if res == 0:
-            self.current_url = self.url_high
-        else:
-            self.current_url = self.url_low
-        time.sleep(0.3)
+            self.thread.wait()
         self.init_capture()
 
     def update_frame(self, img):
@@ -195,7 +213,7 @@ class CameraViewer(QLabel):
             return
         cam_id = int(e.mimeData().text())
         parent = self.parent()
-        source = next((v for v in parent.viewers if v.camera == cam_id), None)
+        source = next((v for v in parent.viewers if v.camera_id == cam_id), None)
         target = self
         if source and source != target:
             parent.swap_viewers(source, target)
@@ -211,7 +229,7 @@ class CameraViewer(QLabel):
         ).manhattanLength() > QApplication.startDragDistance():
             drag = QDrag(self)
             mime = QMimeData()
-            mime.setText(str(self.camera))
+            mime.setText(str(self.camera_id))
             drag.setMimeData(mime)
             drag.exec(Qt_MoveAction)
 
@@ -235,22 +253,60 @@ class MosaicoRTSP(QWidget):
         self.original_positions = {}
         self.current_fullscreen = None
 
-        self.viewer_del = None
+        self.selected_viewer = None
 
         self.reload_cameras()
+
+    def show_about_dialog(self):
+        dlg = AboutDialog(self)
+        dlg.exec()
 
     def add_camera_dialog(self):
         dlg = AddCameraDialog(self)
         if dlg.exec() == QDialog_Accepted:
             low_url = dlg.low_url
             high_url = dlg.high_url
-            # Cria um objeto viewer com essas urls e adiciona
-            # Vamos precisar adaptar a CameraViewer para aceitar urls dinâmicas
             self.add_camera_with_urls(low_url, high_url)
+
+    def copy_camera_dialog(self):
+        if not self.selected_viewer:
+            return
+
+        cam_id = self.selected_viewer.camera_id
+        cam_data = next((c for c in self.cameras if c["id"] == cam_id), None)
+        if not cam_data:
+            return
+
+        dlg = AddCameraDialog(self)
+        dlg.low_url_edit.setText(cam_data["url_low"])
+        dlg.high_url_edit.setText(cam_data["url_high"])
+
+        if dlg.exec() == QDialog_Accepted:
+            low_url = dlg.low_url
+            high_url = dlg.high_url
+            self.add_camera_with_urls(low_url, high_url)
+
+    def edit_camera_dialog(self):
+        if not self.selected_viewer:
+            return
+        viewer = self.selected_viewer
+        cam_id = viewer.camera_id
+        cam_data = next((c for c in self.cameras if c["id"] == cam_id), None)
+        if not cam_data:
+            return
+        dlg = AddCameraDialog(self)
+        dlg.low_url_edit.setText(cam_data["url_low"])
+        dlg.high_url_edit.setText(cam_data["url_high"])
+        if dlg.exec() == QDialog_Accepted:
+            cam_data["url_low"] = dlg.low_url
+            cam_data["url_high"] = dlg.high_url
+            self.save_config()
+            self.reload_cameras()
 
     def add_camera_with_urls(self, low_url, high_url):
         # Acha um ID disponível para a nova câmera, ex: o próximo inteiro livre
-        new_cam_id = max(self.cameras) + 1 if self.cameras else 1
+        # new_cam_id = max(self.cameras) + 1 if self.cameras else 1
+        new_cam_id = max(cam["id"] for cam in self.cameras) + 1 if self.cameras else 1
         self.cameras.append(
             {"id": new_cam_id, "url_low": low_url, "url_high": high_url}
         )
@@ -276,19 +332,53 @@ class MosaicoRTSP(QWidget):
             self.current_fullscreen = None
 
     def swap_viewers(self, viewer1, viewer2):
+        # r1, c1 = self.original_positions[viewer1]
+        # r2, c2 = self.original_positions[viewer2]
+        #
+        # self.layout.removeWidget(viewer1)
+        # self.layout.removeWidget(viewer2)
+        #
+        # self.layout.addWidget(viewer1, r2, c2)
+        # self.layout.addWidget(viewer2, r1, c1)
+        #
+        # self.original_positions[viewer1], self.original_positions[viewer2] = (r2, c2), (
+        #     r1,
+        #     c1,
+        # )
         r1, c1 = self.original_positions[viewer1]
         r2, c2 = self.original_positions[viewer2]
 
+        # Troca os widgets no layout
         self.layout.removeWidget(viewer1)
         self.layout.removeWidget(viewer2)
 
         self.layout.addWidget(viewer1, r2, c2)
         self.layout.addWidget(viewer2, r1, c1)
 
+        # Atualiza posições no dicionário
         self.original_positions[viewer1], self.original_positions[viewer2] = (r2, c2), (
             r1,
             c1,
         )
+
+        # --- Atualiza a lista self.cameras para persistir ordem ---
+        idx1 = next(
+            i for i, cam in enumerate(self.cameras) if cam["id"] == viewer1.camera_id
+        )
+        idx2 = next(
+            i for i, cam in enumerate(self.cameras) if cam["id"] == viewer2.camera_id
+        )
+        self.cameras[idx1], self.cameras[idx2] = self.cameras[idx2], self.cameras[idx1]
+
+        # atualize também self.viewers para manter coerência
+        idx_v1 = self.viewers.index(viewer1)
+        idx_v2 = self.viewers.index(viewer2)
+        self.viewers[idx_v1], self.viewers[idx_v2] = (
+            self.viewers[idx_v2],
+            self.viewers[idx_v1],
+        )
+
+        self.save_config()
 
     def reorganize_grid(self):
         count = len(self.viewers)
@@ -331,7 +421,7 @@ class MosaicoRTSP(QWidget):
         self.cameras.remove(cam_to_remove)
 
         # Encontra o viewer correspondente
-        viewer = next((v for v in self.viewers if v.camera == cam_id), None)
+        viewer = next((v for v in self.viewers if v.camera_id == cam_id), None)
         if not viewer:
             print(f"Viewer para câmera {cam_id} não encontrado.")
             return
@@ -370,6 +460,9 @@ class MosaicoRTSP(QWidget):
 
     def closeEvent(self, event):
         for viewer in self.viewers:
+            if viewer.thread:
+                viewer.thread.stop()
+                viewer.thread.wait()
             viewer.close()
         event.accept()
 
@@ -395,13 +488,6 @@ class MosaicoRTSP(QWidget):
             super().keyPressEvent(event)
 
     def dragEnterEvent(self, e):
-        e.accept()
-
-    def dropEvent(self, e):
-        cam_id = int(e.mimeData().text())
-        source = find_viewer_by_camera(cam_id)
-        # target_pos = layout.indexOf(self).row(), layout.indexOf(self).column()
-        swap_layout_positions(source, self)
         e.accept()
 
     def do_exit(self):
@@ -475,23 +561,36 @@ class MosaicoRTSP(QWidget):
         menu = QMenu(self)
         add_action = QAction("Adicionar câmera", self)
         remove_action = QAction("Remover câmera", self)
+        copy_action = QAction("Copiar câmera", self)
+        edit_action = QAction("Editar câmera", self)
+        about_action = QAction("Sobre...", self)
         exit_action = QAction("Sair", self)
         exit_action.triggered.connect(self.do_exit)
         add_action.triggered.connect(self.add_camera_dialog)
-        if isinstance(widget_clicado, CameraViewer):
-            self.viewer_del = widget_clicado
-            remove_action.setEnabled(True)
-        else:
-            self.viewer_del = None
-            remove_action.setEnabled(False)
+        copy_action.triggered.connect(self.copy_camera_dialog)
         remove_action.triggered.connect(self.remove_camera_dialog)
+        edit_action.triggered.connect(self.edit_camera_dialog)
+        about_action.triggered.connect(self.show_about_dialog)
+        if isinstance(widget_clicado, CameraViewer):
+            self.selected_viewer = widget_clicado
+            remove_action.setEnabled(True)
+            edit_action.setEnabled(True)
+            copy_action.setEnabled(True)
+        else:
+            self.selected_viewer = None
+            remove_action.setEnabled(False)
+            edit_action.setEnabled(False)
+            copy_action.setEnabled(False)
         menu.addAction(add_action)
+        menu.addAction(copy_action)
+        menu.addAction(edit_action)
         menu.addAction(remove_action)
+        menu.addAction(about_action)
         menu.addAction(exit_action)
         menu.exec(event.globalPos())
 
     def remove_camera_dialog(self):
-        if self.viewer_del is None:
+        if self.selected_viewer is None:
             return
         if not self.cameras:
             return
@@ -503,32 +602,42 @@ class MosaicoRTSP(QWidget):
             QMessageBox_Yes | QMessageBox_No,
         )
         if reply == QMessageBox_Yes:
-            cam = self.viewer_del.camera
+            cam = self.selected_viewer.camera_id
             self.remove_camera(cam)
 
     def reload_cameras(self):
-        # Fecha e remove todos os viewers atuais
-        for v in self.viewers:
-            v.close()
-            self.layout.removeWidget(v)
-            v.deleteLater()
-
+        # Mapeia viewers existentes por ID
+        existing_viewers = {v.camera_id: v for v in self.viewers}
+        self.original_positions.clear()
         self.viewers.clear()
-        count = len(self.cameras)
 
-        if count == 0:
+        if not self.cameras:
             self.cols = 1
             self.rows = 1
             self.show_no_camera_widget()
             return
 
+        count = len(self.cameras)
         self.cols = int(math.ceil(math.sqrt(count)))
         self.rows = int(math.ceil(count / self.cols))
-        self.original_positions.clear()
+
+        # Lista de IDs novos para remoção posterior
+        used_ids = set()
 
         for index, cam in enumerate(self.cameras):
+            cam_id = cam["id"]
+            cam_url = cam["url_low"]
+            cam_url_high = cam.get("url_high", "")
 
-            viewer = CameraViewer(cam["id"], cam["url_low"], cam["url_high"])
+            viewer = existing_viewers.get(cam_id)
+            if viewer:
+                # Reconectar só se a URL mudou
+                if viewer.current_url != cam_url:
+                    viewer.set_url(cam_url)
+                existing_viewers.pop(cam_id)  # Remove da lista de existentes
+            else:
+                # Criar novo viewer
+                viewer = CameraViewer(cam_id, cam_url, cam_url_high)
 
             row = index // self.cols
             col = index % self.cols
@@ -536,6 +645,13 @@ class MosaicoRTSP(QWidget):
             self.layout.addWidget(viewer, row, col)
             self.viewers.append(viewer)
             self.original_positions[viewer] = (row, col)
+            used_ids.add(cam_id)
+
+        # Remove viewers que não estão mais em uso
+        for cam_id, viewer in existing_viewers.items():
+            viewer.close()
+            self.layout.removeWidget(viewer)
+            viewer.deleteLater()
 
 
 if __name__ == "__main__":
@@ -547,7 +663,7 @@ if __name__ == "__main__":
 
     # splash = QSplashScreen(pixmap)
     splash = QSplashScreen(
-        pixmap, Qt_WintowType_WindowStaysOnTopHint | Qt_WindowType_FramelessWindowHint
+        pixmap, Qt_WindowType_WindowStaysOnTopHint | Qt_WindowType_FramelessWindowHint
     )
     splash.showMessage(
         "Carregando Câmeras...",
@@ -556,7 +672,7 @@ if __name__ == "__main__":
     )
     splash.show()
 
-    time.sleep(2)
+    QApplication.processEvents()
 
     window = MosaicoRTSP()
     window.showMaximized()

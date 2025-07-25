@@ -1,5 +1,4 @@
 try:
-
     from PyQt6.QtWidgets import (
         QApplication,
         QWidget,
@@ -19,7 +18,7 @@ try:
     from PyQt6.QtCore import QTimer, Qt, QMimeData, QThread, pyqtSignal
 
     Qt_WindowType_FramelessWindowHint = Qt.WindowType.FramelessWindowHint
-    Qt_WintowType_WindowStaysOnTopHint = Qt.WindowType.WindowStaysOnTopHint
+    Qt_WindowType_WindowStaysOnTopHint = Qt.WindowType.WindowStaysOnTopHint
     Qt_AlignmentFlag_AlignBottom = Qt.AlignmentFlag.AlignBottom
     Qt_AlignmentFlag_AlignCenter = Qt.AlignmentFlag.AlignCenter
     Qt_Color_White = Qt.GlobalColor.white
@@ -42,6 +41,8 @@ try:
     QMessageBox_Yes = QMessageBox.StandardButton.Yes
     QMessageBox_No = QMessageBox.StandardButton.No
     QMessageBox_Cancel = QMessageBox.StandardButton.Cancel
+
+    QImage_Format_RGB888 = QImage.Format.Format_RGB888
 
     QT_COMPAT_VERSION = 6
 
@@ -69,11 +70,11 @@ except:
     from PyQt5.QtCore import QTimer, Qt, QMimeData, QThread, pyqtSignal
 
     Qt_WindowType_FramelessWindowHint = Qt.FramelessWindowHint
-    Qt_WintowType_WindowStaysOnTopHint = Qt.WindowStaysOnTopHint
+    Qt_WindowType_WindowStaysOnTopHint = Qt.WindowStaysOnTopHint
 
-    Qt_AspectRatioMode_KeepAspectRatio = (Qt.AspectRatioMode.KeepAspectRatio,)
+    Qt_AspectRatioMode_KeepAspectRatio = Qt.AspectRatioMode.KeepAspectRatio
     Qt_TransformationMode_SmoothTransformation = (
-        Qt.TransformationMode.SmoothTransformation,
+        Qt.TransformationMode.SmoothTransformation
     )
 
     Qt_AlignmentFlag_AlignBottom = Qt.AlignBottom
@@ -95,6 +96,8 @@ except:
     QMessageBox_Cancel = QMessageBox.Cancel
 
     QT_COMPAT_VERSION = 5
+
+    QImage_Format_RGB888 = QImage.Format_RGB888
 
     def Qt_Compat_GetMousePoint(e):
         return e.globalPos()
