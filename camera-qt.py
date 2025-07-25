@@ -60,6 +60,22 @@ class AboutDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
+        # Caminho do ícone (ajusta conforme o nome do seu ícone)
+        icon_path = os.path.join(os.path.dirname(__file__), "rtsp-client-icon.svg")
+        if os.path.exists(icon_path):
+            pixmap = QPixmap(icon_path)
+            icon_label = QLabel()
+            icon_label.setPixmap(
+                pixmap.scaled(
+                    64,
+                    64,
+                    Qt_AspectRatioMode_KeepAspectRatio,
+                    Qt_TransformationMode_SmoothTransformation,
+                )
+            )
+            icon_label.setAlignment(Qt_AlignmentFlag_AlignCenter)
+            layout.addWidget(icon_label)
+
         app_info = QLabel("Mosaico RTSP\nVersão 1.0\n© 2025 Alexandre")
         app_info.setAlignment(Qt_AlignmentFlag_AlignCenter)
         layout.addWidget(app_info)
