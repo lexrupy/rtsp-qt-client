@@ -19,8 +19,10 @@ from qtcompat import (
 )
 
 
-def prevent_screensaver():
-    os.system("xdg-screensaver reset")
+def prevent_screensaver(w):
+    if w.isFullScreen():
+        os.system("xdg-screensaver reset")
+    else:
 
 
 if __name__ == "__main__":
@@ -47,11 +49,12 @@ if __name__ == "__main__":
 
     QApplication.processEvents()
 
-    timer = QTimer()
-    timer.timeout.connect(prevent_screensaver)
-    timer.start(30000)  # a cada 30s
     window = MosaicoRTSP()
     window.showMaximized()
+
+    timer = QTimer()
+    timer.timeout.connect(lambda: prevent_screensaver(window))
+    timer.start(30000)  # a cada 30s
 
     splash.finish(window)  # fecha o splash depois que a janela abriu
     if QT_COMPAT_VERSION == 6:
