@@ -26,7 +26,6 @@ try:
         QThread,
         pyqtSignal,
         QT_VERSION_STR,
-        QWIDGETSIZE_MAX as _QWIDGETSIZE_MAX,
     )
 
     Qt_WindowType_FramelessWindowHint = Qt.WindowType.FramelessWindowHint
@@ -60,7 +59,7 @@ try:
 
     QT_COMPAT_VERSION = 6
 
-    QWIDGETSIZE_MAX = _QWIDGETSIZE_MAX
+    QWIDGETSIZE_MAX = 16777215
 
     def Qt_Compat_GetMousePoint(e):
         return e.globalPosition().toPoint()

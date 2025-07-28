@@ -1,322 +1,35 @@
 import os
 import math
 import time
-import cv2
 import configparser
 
 from qtcompat import (
     QLabel,
-    QLineEdit,
-    QPushButton,
-    QImage,
-    QPixmap,
     QApplication,
-    QDrag,
-    QMimeData,
-    QComboBox,
     QSizePolicy_Expanding,
     QWidget,
     QGridLayout,
-    QHBoxLayout,
-    QVBoxLayout,
     QMessageBox,
-    QDialog,
     QMenu,
     QAction,
-    QThread,
-    pyqtSignal,
     QMessageBox_No,
     QMessageBox_Yes,
     QDialog_Accepted,
     Qt_AlignmentFlag_AlignCenter,
-    Qt_AspectRatioMode_KeepAspectRatio,
     Qt_Key_Escape,
     Qt_Key_F,
     Qt_Key_F11,
     Qt_KeyModifier_Control,
-    Qt_TransformationMode_SmoothTransformation,
-    Qt_LeftButton,
-    Qt_MoveAction,
-    Qt_Compat_GetMousePoint,
-    QImage_Format_RGB888,
-    QT_COMPAT_VERSION,
-    QT_VERSION_STR,
     QWIDGETSIZE_MAX,
 )
 
 
+from about import AboutDialog
+from addcamera import AddCameraDialog
+from cameraview import CameraViewer
+
+
 CONFIG_FILE = os.path.expanduser("~/.config/rtsp-qt-client/config.ini")
-
-
-class AboutDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Sobre o Aplicativo")
-        self.resize(400, 200)
-
-        layout = QVBoxLayout(self)
-
-        # Caminho do ícone (ajusta conforme o nome do seu ícone)
-        icon_path = os.path.join(os.path.dirname(__file__), "rtsp-client-icon.svg")
-        if os.path.exists(icon_path):
-            pixmap = QPixmap(icon_path)
-            icon_label = QLabel()
-            icon_label.setPixmap(
-                pixmap.scaled(
-                    64,
-                    64,
-                    Qt_AspectRatioMode_KeepAspectRatio,
-                    Qt_TransformationMode_SmoothTransformation,
-                )
-            )
-            icon_label.setAlignment(Qt_AlignmentFlag_AlignCenter)
-            layout.addWidget(icon_label)
-        app_info = QLabel(
-            f"""
-        <h2 style='margin: 4px;'>Mosaico RTSP</h2>
-        <p>Aplicativo para exibição simultânea de múltiplas câmeras via RTSP.</p>
-        <p><b>Versão do Qt:</b> {QT_VERSION_STR}</p>
-        <p>Desenvolvido por Alexandre - {os.uname().nodename}</p>
-        """
-        )
-        # app_info = QLabel("Mosaico RTSP\nVersão 1.0\n© 2025 Alexandre")
-        app_info.setAlignment(Qt_AlignmentFlag_AlignCenter)
-        layout.addWidget(app_info)
-
-        qt_version_str = f"Qt Version: {'6' if QT_COMPAT_VERSION == 6 else '5'}"
-        qt_label = QLabel(qt_version_str)
-        qt_label.setAlignment(Qt_AlignmentFlag_AlignCenter)
-        layout.addWidget(qt_label)
-
-        btn_close = QPushButton("Fechar")
-        btn_close.clicked.connect(self.accept)
-        layout.addWidget(btn_close)
-
-
-class AddCameraDialog(QDialog):
-    def __init__(self, parent=None, stream_type="Auto"):
-        super().__init__(parent)
-        self.setWindowTitle("Adicionar/Editar Câmera")
-        self.resize(700, 160)  # Largura x Altura
-        self.low_url = ""
-        self.high_url = ""
-        self.stream_type = stream_type
-
-        layout = QVBoxLayout(self)
-
-        layout.addWidget(QLabel("URL Low Resolution:"))
-        self.low_url_edit = QLineEdit(self)
-        layout.addWidget(self.low_url_edit)
-
-        layout.addWidget(QLabel("URL High Resolution:"))
-        self.high_url_edit = QLineEdit(self)
-        layout.addWidget(self.high_url_edit)
-
-        layout.addWidget(QLabel("Tipo de captura:"))
-        self.stream_type_combo = QComboBox(self)
-        self.stream_type_combo.addItems(
-            ["Auto", "OpenCV", "GStreamer", "Ffmpeg", "DirectShow", "MSMF"]
-        )
-        self.stream_type_combo.setCurrentText(self.stream_type)
-        layout.addWidget(self.stream_type_combo)
-
-        btn_layout = QHBoxLayout()
-        self.ok_btn = QPushButton("OK", self)
-        self.cancel_btn = QPushButton("Cancelar", self)
-        btn_layout.addWidget(self.ok_btn)
-        btn_layout.addWidget(self.cancel_btn)
-        layout.addLayout(btn_layout)
-
-        self.ok_btn.clicked.connect(self.accept)
-        self.cancel_btn.clicked.connect(self.reject)
-
-    def accept(self):
-        low_url = self.low_url_edit.text().strip()
-        high_url = self.high_url_edit.text().strip()
-        if not low_url or not high_url:
-            QMessageBox.warning(self, "Erro", "Ambas as URLs devem ser preenchidas.")
-            return
-        self.low_url = low_url
-        self.high_url = high_url
-        self.stream_type = self.stream_type_combo.currentText()
-        super().accept()
-
-
-class CameraThread(QThread):
-    frame_ready = pyqtSignal(QImage)
-    connection_failed = pyqtSignal()
-    stopped = pyqtSignal()
-
-    def __init__(self, url, stream_type="Auto"):
-        super().__init__()
-        self.url = url
-        self.stream_type = stream_type
-        self.running = True
-
-    def run(self):
-
-        if self.stream_type == "GStreamer":
-            gst = (
-                f"rtspsrc location={self.url} latency=0 ! "
-                "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
-            )
-            self.cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
-        elif self.stream_type == "OpenCV":
-            self.cap = cv2.VideoCapture(self.url)
-        elif self.stream_type == "Ffmpeg":
-            self.cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
-        elif self.stream_type == "DirectShow":
-            self.cap = cv2.VideoCapture(self.url, cv2.CAP_DSHOW)
-        elif self.stream_type == "MSMF":
-            self.cap = cv2.VideoCapture(self.url, cv2.CAP_MSMF)
-        else:
-            self.cap = cv2.VideoCapture(self.url)
-
-        if not self.cap.isOpened():
-            self.connection_failed.emit()
-            self.stopped.emit()
-            return
-
-        while self.running:
-            ret, frame = self.cap.read()
-            if not ret:
-                time.sleep(0.01)
-                continue
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb.shape
-            bytesPerLine = ch * w
-            image = QImage(rgb.data, w, h, bytesPerLine, QImage_Format_RGB888).copy()
-            self.frame_ready.emit(image)
-
-        self.cap.release()
-        self.stopped.emit()
-
-    def stop(self):
-        self.running = False
-        if hasattr(self, "cap") and self.cap.isOpened():
-            self.cap.release()
-        self.wait()
-
-
-class CameraViewer(QLabel):
-    def __init__(self, camera, url_low=None, url_high=None, stream_type="Auto"):
-        super().__init__()
-        self.camera_id = camera
-        self.url_low = url_low if url_low else ""
-        self.url_high = url_high if url_high else ""
-        self.stream_type = stream_type
-        self.reconnecting = False
-        self.setScaledContents(True)
-        self.setMinimumSize(0, 0)
-        self.setAlignment(Qt_AlignmentFlag_AlignCenter)
-        self.setSizePolicy(QSizePolicy_Expanding, QSizePolicy_Expanding)
-        self.setText("Conectando...")
-        self.setStyleSheet("background-color: black; color: white; font-size: 16px;")
-        self.last_esc_time = 0
-        self.thread = None
-        self.current_url = self.url_low
-        self.connecting = False
-        self.init_capture()
-
-    def init_capture(self):
-        self.connecting = True
-        self.setPixmap(QPixmap())  # limpa imagem antiga
-        self.thread = CameraThread(self.current_url, self.stream_type)
-        self.thread.frame_ready.connect(self.update_frame)
-        self.thread.connection_failed.connect(self.show_connection_error)
-        self.thread.start()
-
-    def change_res(self, res=0):
-        new_url = self.url_high if res == 0 else self.url_low
-        self.set_url(new_url)
-
-    def reconnect(self):
-        if self.reconnecting:
-            return  # evita reconectar várias vezes ao mesmo tempo
-        self.reconnecting = True
-        if self.thread:
-            self.thread.stopped.connect(self._do_reconnect)
-            self.thread.stop()
-        else:
-            self._do_reconnect()
-
-    def _do_reconnect(self):
-        # desconectar para evitar chamadas repetidas
-        if self.thread:
-            try:
-                self.thread.stopped.disconnect(self._do_reconnect)
-            except Exception:
-                pass
-            self.thread = None
-        self.init_capture()
-        self.reconnecting = False
-
-    def set_url(self, new_url):
-        if not new_url or new_url == self.current_url:
-            return  # Nada a fazer se for a mesma URL
-        self.current_url = new_url
-        self.reconnect()
-
-    def update_frame(self, img):
-        if self.connecting:
-            self.connecting = False
-            self.setText("")  # esconde texto conectando
-        self.setPixmap(
-            QPixmap.fromImage(img).scaled(
-                self.size(),
-                Qt_AspectRatioMode_KeepAspectRatio,
-                Qt_TransformationMode_SmoothTransformation,
-            )
-        )
-
-    def show_connection_error(self):
-        self.connecting = False
-        self.setText("Erro ao conectar")
-        self.setPixmap(QPixmap())  # limpa imagem
-
-    def close(self):
-        if self.thread:
-            self.thread.stop()
-            self.thread.wait()
-            self.thread = None
-        super().close()
-
-    def mouseDoubleClickEvent(self, event):
-        self.parent().toggle_fullscreen(self)
-
-    def dragEnterEvent(self, e):
-        if e.mimeData().hasText():
-            e.acceptProposedAction()
-
-    def dropEvent(self, e):
-        if not e.mimeData().hasText():
-            return
-        cam_id = int(e.mimeData().text())
-        parent = self.parent()
-        source = next((v for v in parent.viewers if v.camera_id == cam_id), None)
-        target = self
-        if source and source != target:
-            parent.swap_viewers(source, target)
-        e.acceptProposedAction()
-
-    def mousePressEvent(self, e):
-        if e.button() == Qt_LeftButton:
-            self.drag_start_pos = Qt_Compat_GetMousePoint(e)
-
-    def mouseMoveEvent(self, e):
-        if (e.buttons() & Qt_LeftButton) and (
-            Qt_Compat_GetMousePoint(e) - self.drag_start_pos
-        ).manhattanLength() > QApplication.startDragDistance():
-            drag = QDrag(self)
-            mime = QMimeData()
-            mime.setText(str(self.camera_id))
-            drag.setMimeData(mime)
-            drag.exec(Qt_MoveAction)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.update()
-        self.updateGeometry()
 
 
 class MosaicoRTSP(QWidget):
