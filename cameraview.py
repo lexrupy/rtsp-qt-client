@@ -3,6 +3,7 @@ from qtcompat import (
     QPixmap,
     QApplication,
     QDrag,
+    QTimer,
     QMimeData,
     QSizePolicy_Expanding,
     Qt_AlignmentFlag_AlignCenter,
@@ -46,34 +47,20 @@ class CameraViewer(QLabel):
 
     def change_res(self, res=0):
         new_url = self.url_high if res == 0 else self.url_low
-        self.set_url(new_url)
+        self.reconnect_with(new_url=new_url)
 
-    def reconnect(self):
-        if self.reconnecting:
-            return  # evita reconectar várias vezes ao mesmo tempo
-        self.reconnecting = True
-        if self.thread:
-            self.thread.stopped.connect(self._do_reconnect)
-            self.thread.stop()
-        else:
-            self._do_reconnect()
+    def reconnect_with(self, new_url=None):
+        new_url = new_url or self.current_url
 
-    def _do_reconnect(self):
-        # desconectar para evitar chamadas repetidas
-        if self.thread:
-            try:
-                self.thread.stopped.disconnect(self._do_reconnect)
-            except Exception:
-                pass
-            self.thread = None
-        self.init_capture()
-        self.reconnecting = False
+        if new_url == self.current_url:
+            return  # Nada mudou
 
-    def set_url(self, new_url):
-        if not new_url or new_url == self.current_url:
-            return  # Nada a fazer se for a mesma URL
         self.current_url = new_url
-        self.reconnect()
+
+        if self.thread:
+            self.thread.restart_with(new_url)
+        else:
+            self.init_capture()
 
     def update_frame(self, img):
         if self.connecting:

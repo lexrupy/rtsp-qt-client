@@ -92,7 +92,7 @@ class MosaicoRTSP(QWidget):
         cam_data = next((c for c in self.cameras if c["id"] == cam_id), None)
         if not cam_data:
             return
-        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"])
+        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"], editing=True)
         dlg.low_url_edit.setText(cam_data["url_low"])
         dlg.high_url_edit.setText(cam_data["url_high"])
         if dlg.exec() == QDialog_Accepted:
@@ -100,6 +100,7 @@ class MosaicoRTSP(QWidget):
             cam_data["url_high"] = dlg.high_url
             cam_data["stream_type"] = dlg.stream_type
             self.save_config()
+
             self.reload_cameras()
 
     def add_camera_with_urls(self, low_url, high_url, stream_type="Auto"):
@@ -427,18 +428,15 @@ class MosaicoRTSP(QWidget):
         for index, cam in enumerate(self.cameras):
             cam_id = cam["id"]
             cam_url = cam["url_low"]
-            cam_url_high = cam.get("url_high", "")
-            stream_type = cam.get("stream_type", "")
+            cam_url_high = cam["url_high"]
+            stream_type = cam["stream_type"]
 
             viewer = existing_viewers.get(cam_id)
+
             if viewer:
                 # Reconectar só se a URL mudou
                 if viewer.current_url != cam_url:
-                    viewer.set_url(cam_url)
-
-                if viewer.stream_type != stream_type:
-                    viewer.stream_type = stream_type
-                    viewer.reconnect()
+                    viewer.reconnect_with(new_url=cam_url)
 
                 existing_viewers.pop(cam_id)  # Remove da lista de existentes
             else:

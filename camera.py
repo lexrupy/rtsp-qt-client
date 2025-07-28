@@ -20,8 +20,11 @@ class CameraThread(QThread):
         self.url = url
         self.stream_type = stream_type
         self.running = True
+        self.cap = None
 
     def run(self):
+
+        self.cap = None
 
         if self.stream_type == "GStreamer":
             gst = (
@@ -46,10 +49,12 @@ class CameraThread(QThread):
             return
 
         while self.running:
+            if self.cap is None or not self.cap.isOpened():
+                break
             ret, frame = self.cap.read()
             if not ret:
-                time.sleep(0.01)
-                continue
+                self.connection_failed.emit()
+                break
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb.shape
             bytesPerLine = ch * w
@@ -59,8 +64,24 @@ class CameraThread(QThread):
         self.cap.release()
         self.stopped.emit()
 
+    def restart_with(self, url):
+        if url == self.url:
+            return
+
+        self.stop()
+        if self.isRunning():
+            self.wait()
+
+        self.url = url
+        self.running = True
+        self.start()
+
     def stop(self):
         self.running = False
-        if hasattr(self, "cap") and self.cap.isOpened():
-            self.cap.release()
-        self.wait()
+        try:
+            if hasattr(self, "cap") and self.cap.isOpened():
+                self.cap.release()
+                self.cap = None
+
+        except Exception:
+            pass
