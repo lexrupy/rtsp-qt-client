@@ -82,7 +82,8 @@ class MosaicoRTSP(QWidget):
         if dlg.exec() == QDialog_Accepted:
             low_url = dlg.low_url
             high_url = dlg.high_url
-            self.add_camera_with_urls(low_url, high_url)
+            stream_type = dlg.stream_type
+            self.add_camera_with_urls(low_url, high_url, stream_type=stream_type)
 
     def edit_camera_dialog(self):
         if not self.selected_viewer:
