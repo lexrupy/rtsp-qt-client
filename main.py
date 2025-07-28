@@ -7,6 +7,7 @@ from mosaic import MosaicoRTSP
 from qtcompat import (
     QPixmap,
     QIcon,
+    QTimer,
     QApplication,
     QSplashScreen,
     Qt_AlignmentFlag_AlignBottom,
@@ -16,6 +17,11 @@ from qtcompat import (
     Qt_WindowType_WindowStaysOnTopHint,
     QT_COMPAT_VERSION,
 )
+
+
+def prevent_screensaver():
+    os.system("xdg-screensaver reset")
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -41,6 +47,9 @@ if __name__ == "__main__":
 
     QApplication.processEvents()
 
+    timer = QTimer()
+    timer.timeout.connect(prevent_screensaver)
+    timer.start(30000)  # a cada 30s
     window = MosaicoRTSP()
     window.showMaximized()
 
