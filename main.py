@@ -21,6 +21,9 @@ from qtcompat import (
 
 def prevent_screensaver(w):
     if w.isFullScreen():
+        os.system("xset s off")
+        os.system("xset -dpms")
+        os.system("xset noblank")
         os.system("xdg-screensaver reset")
 
 
