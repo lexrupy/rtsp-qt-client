@@ -365,6 +365,7 @@ class MosaicoRTSP(QWidget):
         remove_action = QAction("Remover câmera", self)
         copy_action = QAction("Copiar câmera", self)
         edit_action = QAction("Editar câmera", self)
+        reconnect_action = QAction("Reconectar vídeos...", self)
         about_action = QAction("Sobre...", self)
         exit_action = QAction("Sair", self)
         exit_action.triggered.connect(self.do_exit)
@@ -373,6 +374,7 @@ class MosaicoRTSP(QWidget):
         remove_action.triggered.connect(self.remove_camera_dialog)
         edit_action.triggered.connect(self.edit_camera_dialog)
         about_action.triggered.connect(self.show_about_dialog)
+        reconnect_action.triggered.connect(self.reconnect_all_cameras)
         if isinstance(widget_clicado, CameraViewer):
             self.selected_viewer = widget_clicado
             remove_action.setEnabled(True)
@@ -387,9 +389,14 @@ class MosaicoRTSP(QWidget):
         menu.addAction(copy_action)
         menu.addAction(edit_action)
         menu.addAction(remove_action)
+        menu.addAction(reconnect_action)
         menu.addAction(about_action)
         menu.addAction(exit_action)
         menu.exec(event.globalPos())
+
+    def reconnect_all_cameras(self):
+        for viewer in self.viewers:
+            viewer.reconnect_with(force=True)
 
     def remove_camera_dialog(self):
         if self.selected_viewer is None:

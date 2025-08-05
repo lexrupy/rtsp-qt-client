@@ -49,16 +49,16 @@ class CameraViewer(QLabel):
         new_url = self.url_high if res == 0 else self.url_low
         self.reconnect_with(new_url=new_url)
 
-    def reconnect_with(self, new_url=None):
+    def reconnect_with(self, new_url=None, force=False):
         new_url = new_url or self.current_url
 
-        if new_url == self.current_url:
+        if not force and new_url == self.current_url:
             return  # Nada mudou
 
         self.current_url = new_url
 
         if self.thread:
-            self.thread.restart_with(new_url)
+            self.thread.restart_with(new_url, force=force)
         else:
             self.init_capture()
 

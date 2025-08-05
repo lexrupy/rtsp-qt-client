@@ -64,8 +64,8 @@ class CameraThread(QThread):
         self.cap.release()
         self.stopped.emit()
 
-    def restart_with(self, url):
-        if url == self.url:
+    def restart_with(self, url, force=False):
+        if not force and url == self.url:
             return
 
         self.stop()
