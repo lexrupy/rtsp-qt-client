@@ -489,6 +489,8 @@ class MosaicoRTSP(QWidget):
             viewer = existing_viewers.get(cam_id)
 
             if viewer:
+                viewer.detect_person = detect_person
+                viewer.alarm_on_detect = alarm_on_detect
                 # Reconectar só se a URL mudou
                 if viewer.current_url != cam_url:
                     viewer.reconnect_with(new_url=cam_url)
