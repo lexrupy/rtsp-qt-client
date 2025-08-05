@@ -66,7 +66,15 @@ class MosaicoRTSP(QWidget):
             low_url = dlg.low_url
             high_url = dlg.high_url
             stream_type = dlg.stream_type
-            self.add_camera_with_urls(low_url, high_url, stream_type)
+            detect_person = dlg.detect_person
+            alarm_on_detect = dlg.alarm_on_detect
+            self.add_camera_with_urls(
+                low_url,
+                high_url,
+                stream_type=stream_type,
+                detect_person=detect_person,
+                alarm_on_detect=alarm_on_detect,
+            )
 
     def copy_camera_dialog(self):
         if not self.selected_viewer:
@@ -80,12 +88,22 @@ class MosaicoRTSP(QWidget):
         dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"])
         dlg.low_url_edit.setText(cam_data["url_low"])
         dlg.high_url_edit.setText(cam_data["url_high"])
+        dlg.detect_checkbox.setChecked(cam_data.get("detect_person", False))
+        dlg.alarm_checkbox.setChecked(cam_data.get("alarm_on_detect", False))
 
         if dlg.exec() == QDialog_Accepted:
             low_url = dlg.low_url
             high_url = dlg.high_url
             stream_type = dlg.stream_type
-            self.add_camera_with_urls(low_url, high_url, stream_type=stream_type)
+            detect_person = dlg.detect_person
+            alarm_on_detect = dlg.alarm_on_detect
+            self.add_camera_with_urls(
+                low_url,
+                high_url,
+                stream_type=stream_type,
+                detect_person=detect_person,
+                alarm_on_detect=alarm_on_detect,
+            )
 
     def edit_camera_dialog(self):
         if not self.selected_viewer:
@@ -98,15 +116,26 @@ class MosaicoRTSP(QWidget):
         dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"], editing=True)
         dlg.low_url_edit.setText(cam_data["url_low"])
         dlg.high_url_edit.setText(cam_data["url_high"])
+        dlg.detect_checkbox.setChecked(cam_data.get("detect_person", False))
+        dlg.alarm_checkbox.setChecked(cam_data.get("alarm_on_detect", False))
         if dlg.exec() == QDialog_Accepted:
             cam_data["url_low"] = dlg.low_url
             cam_data["url_high"] = dlg.high_url
             cam_data["stream_type"] = dlg.stream_type
+            cam_data["detect_person"] = dlg.detect_person
+            cam_data["alarm_on_detect"] = dlg.alarm_on_detect
             self.save_config()
 
             self.reload_cameras()
 
-    def add_camera_with_urls(self, low_url, high_url, stream_type="Auto"):
+    def add_camera_with_urls(
+        self,
+        low_url,
+        high_url,
+        stream_type="Auto",
+        detect_person=False,
+        alarm_on_detect=False,
+    ):
         # Acha um ID disponível para a nova câmera, ex: o próximo inteiro livre
         new_cam_id = max(cam["id"] for cam in self.cameras) + 1 if self.cameras else 1
         self.cameras.append(
@@ -115,6 +144,8 @@ class MosaicoRTSP(QWidget):
                 "url_low": low_url,
                 "url_high": high_url,
                 "stream_type": stream_type,
+                "detect_person": detect_person,
+                "alarm_on_detect": alarm_on_detect,
             }
         )
         self.save_config()
@@ -325,6 +356,12 @@ class MosaicoRTSP(QWidget):
             url_low = self.config.get(section, "url_low", fallback=None)
             url_high = self.config.get(section, "url_high", fallback=None)
             stream_type = self.config.get(section, "stream_type", fallback="GStreamer")
+            detect_person = self.config.getboolean(
+                section, "detect_person", fallback=False
+            )
+            alarm_on_detect = self.config.getboolean(
+                section, "alarm_on_detect", fallback=False
+            )
 
             if not url_low or not url_high:
                 continue
@@ -335,6 +372,8 @@ class MosaicoRTSP(QWidget):
                     "url_low": url_low,
                     "url_high": url_high,
                     "stream_type": stream_type,
+                    "detect_person": detect_person,
+                    "alarm_on_detect": alarm_on_detect,
                 }
             )
 
@@ -354,6 +393,10 @@ class MosaicoRTSP(QWidget):
             self.config.set(section, "url_low", cam.get("url_low", ""))
             self.config.set(section, "url_high", cam.get("url_high", ""))
             self.config.set(section, "stream_type", cam.get("stream_type", ""))
+            self.config.set(section, "detect_person", str(cam.get("detect_person", "")))
+            self.config.set(
+                section, "alarm_on_detect", str(cam.get("alarm_on_detect", ""))
+            )
 
         config_dir = os.path.dirname(CONFIG_FILE)
         os.makedirs(config_dir, exist_ok=True)
@@ -440,6 +483,8 @@ class MosaicoRTSP(QWidget):
             cam_url = cam["url_low"]
             cam_url_high = cam["url_high"]
             stream_type = cam["stream_type"]
+            detect_person = cam["detect_person"]
+            alarm_on_detect = cam["alarm_on_detect"]
 
             viewer = existing_viewers.get(cam_id)
 
@@ -451,7 +496,14 @@ class MosaicoRTSP(QWidget):
                 existing_viewers.pop(cam_id)  # Remove da lista de existentes
             else:
                 # Criar novo viewer
-                viewer = CameraViewer(cam_id, cam_url, cam_url_high, stream_type)
+                viewer = CameraViewer(
+                    cam_id,
+                    cam_url,
+                    cam_url_high,
+                    stream_type,
+                    detect_person,
+                    alarm_on_detect,
+                )
 
             row = index // self.cols
             col = index % self.cols

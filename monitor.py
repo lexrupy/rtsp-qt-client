@@ -1,7 +1,16 @@
+import os
+import subprocess
 import time
 import numpy as np
 import cv2
+
+from detect import detect_person
 from qtcompat import QTimer, QImage
+
+
+ALARM_FILE = os.path.join(os.path.dirname(__file__), "doorbell.mp3")
+last_detection_time = 0
+# ALARM_FILE = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 
 
 def iniciar_monitoramento(
@@ -17,6 +26,7 @@ def iniciar_monitoramento(
     estado = {}
 
     def on_frame(viewer, qimage):
+        global last_detection_time
         agora = time.time()
         estado[viewer] = estado.get(viewer, {})
         estado[viewer]["last_frame_time"] = agora
@@ -36,6 +46,19 @@ def iniciar_monitoramento(
         else:
             # se arr estiver BGR, converta para RGB
             arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+
+        play_sound = False
+
+        if viewer.detect_person:
+            arr, person_detected = detect_person(arr)
+            if person_detected:
+                if agora - last_detection_time > 10:
+                    play_sound = True
+                    last_detection_time = agora
+
+                if viewer.alarm_on_detect:
+                    if play_sound:
+                        subprocess.Popen(["paplay", ALARM_FILE])
 
         # w_rect = width
         # h_rect = height

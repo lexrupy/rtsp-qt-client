@@ -49,7 +49,9 @@ class AboutDialog(QDialog):
         app_info.setAlignment(Qt_AlignmentFlag_AlignCenter)
         layout.addWidget(app_info)
 
-        qt_version_str = f"Qt Version: {'6' if QT_COMPAT_VERSION == 6 else '5'}"
+        qt_version_str = (
+            f"Qt Compatibility Version: {'6' if QT_COMPAT_VERSION == 6 else '5'}"
+        )
         qt_label = QLabel(qt_version_str)
         qt_label.setAlignment(Qt_AlignmentFlag_AlignCenter)
         layout.addWidget(qt_label)

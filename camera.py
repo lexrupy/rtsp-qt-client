@@ -1,5 +1,3 @@
-import os
-import time
 import cv2
 
 from qtcompat import (
@@ -24,24 +22,7 @@ class CameraThread(QThread):
 
     def run(self):
 
-        self.cap = None
-
-        if self.stream_type == "GStreamer":
-            gst = (
-                f"rtspsrc location={self.url} latency=0 ! "
-                "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
-            )
-            self.cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
-        elif self.stream_type == "OpenCV":
-            self.cap = cv2.VideoCapture(self.url)
-        elif self.stream_type == "Ffmpeg":
-            self.cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
-        elif self.stream_type == "DirectShow":
-            self.cap = cv2.VideoCapture(self.url, cv2.CAP_DSHOW)
-        elif self.stream_type == "MSMF":
-            self.cap = cv2.VideoCapture(self.url, cv2.CAP_MSMF)
-        else:
-            self.cap = cv2.VideoCapture(self.url)
+        self.cap = self.configure_cap()
 
         if not self.cap.isOpened():
             self.connection_failed.emit()
@@ -63,6 +44,23 @@ class CameraThread(QThread):
 
         self.cap.release()
         self.stopped.emit()
+
+    def configure_cap(self):
+        if self.stream_type == "GStreamer":
+            gst = (
+                f"rtspsrc location={self.url} latency=0 ! "
+                "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
+            )
+            return cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
+        if self.stream_type == "OpenCV":
+            return cv2.VideoCapture(self.url)
+        if self.stream_type == "Ffmpeg":
+            return cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+        if self.stream_type == "DirectShow":
+            return cv2.VideoCapture(self.url, cv2.CAP_DSHOW)
+        if self.stream_type == "MSMF":
+            return cv2.VideoCapture(self.url, cv2.CAP_MSMF)
+        return cv2.VideoCapture(self.url)
 
     def restart_with(self, url, force=False):
         if not force and url == self.url:

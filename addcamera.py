@@ -1,6 +1,7 @@
 from qtcompat import (
     QLabel,
     QLineEdit,
+    QCheckBox,
     QPushButton,
     QComboBox,
     QHBoxLayout,
@@ -34,13 +35,6 @@ class AddCameraDialog(QDialog):
         self.high_url_edit = QLineEdit(self)
         layout.addWidget(self.high_url_edit)
 
-        # layout.addWidget(QLabel("Tipo de captura:"))
-        # self.stream_type_combo = QComboBox(self)
-        # self.stream_type_combo.addItems(
-        #     ["Auto", "OpenCV", "GStreamer", "Ffmpeg", "DirectShow", "MSMF"]
-        # )
-        # self.stream_type_combo.setCurrentText(self.stream_type)
-        # layout.addWidget(self.stream_type_combo)
         combo_layout = QHBoxLayout()
         self.stream_type_combo = QComboBox(self)
         self.stream_type_combo.addItems(
@@ -63,6 +57,12 @@ class AddCameraDialog(QDialog):
         btn_layout.addWidget(self.cancel_btn)
         layout.addLayout(btn_layout)
 
+        # Novas opções: Detecção de pessoas e Alarme
+        self.detect_checkbox = QCheckBox("Detectar pessoas", self)
+        self.alarm_checkbox = QCheckBox("Soar alarme ao detectar pessoa", self)
+        layout.addWidget(self.detect_checkbox)
+        layout.addWidget(self.alarm_checkbox)
+
         self.ok_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
 
@@ -75,4 +75,6 @@ class AddCameraDialog(QDialog):
         self.low_url = low_url
         self.high_url = high_url
         self.stream_type = self.stream_type_combo.currentText()
+        self.detect_person = self.detect_checkbox.isChecked()
+        self.alarm_on_detect = self.alarm_checkbox.isChecked()
         super().accept()

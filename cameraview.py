@@ -4,7 +4,6 @@ from qtcompat import (
     QPixmap,
     QApplication,
     QDrag,
-    QTimer,
     QMimeData,
     QSizePolicy_Expanding,
     Qt_AlignmentFlag_AlignCenter,
@@ -19,12 +18,22 @@ from camera import CameraThread
 
 
 class CameraViewer(QLabel):
-    def __init__(self, camera, url_low=None, url_high=None, stream_type="Auto"):
+    def __init__(
+        self,
+        camera,
+        url_low=None,
+        url_high=None,
+        stream_type="Auto",
+        detect_person=False,
+        alarm_on_detect=False,
+    ):
         super().__init__()
         self.camera_id = camera
         self.url_low = url_low if url_low else ""
         self.url_high = url_high if url_high else ""
         self.stream_type = stream_type
+        self.detect_person = detect_person
+        self.alarm_on_detect = alarm_on_detect
         self.reconnecting = False
         self._ultimo_frame_ts = None
         self.setScaledContents(True)
