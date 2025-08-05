@@ -8,7 +8,7 @@ from detect import detect_person
 from qtcompat import QTimer, QImage
 
 
-ALARM_FILE = os.path.join(os.path.dirname(__file__), "doorbell.mp3")
+ALARM_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
 last_detection_time = 0
 # ALARM_FILE = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 
