@@ -1,3 +1,4 @@
+import time
 from qtcompat import (
     QLabel,
     QPixmap,
@@ -25,6 +26,7 @@ class CameraViewer(QLabel):
         self.url_high = url_high if url_high else ""
         self.stream_type = stream_type
         self.reconnecting = False
+        self._ultimo_frame_ts = None
         self.setScaledContents(True)
         self.setMinimumSize(0, 0)
         self.setAlignment(Qt_AlignmentFlag_AlignCenter)
@@ -63,6 +65,7 @@ class CameraViewer(QLabel):
             self.init_capture()
 
     def update_frame(self, img):
+        self._ultimo_frame_ts = time.time()
         if self.connecting:
             self.connecting = False
             self.setText("")  # esconde texto conectando

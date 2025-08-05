@@ -27,6 +27,7 @@ from qtcompat import (
 from about import AboutDialog
 from addcamera import AddCameraDialog
 from cameraview import CameraViewer
+from monitor import iniciar_monitoramento
 
 
 CONFIG_FILE = os.path.expanduser("~/.config/rtsp-qt-client/config.ini")
@@ -53,6 +54,7 @@ class MosaicoRTSP(QWidget):
         self.current_fullscreen = None
         self.selected_viewer = None
         self.reload_cameras()
+        self.monitor_timer = iniciar_monitoramento(self.viewers)
 
     def show_about_dialog(self):
         dlg = AboutDialog(self)
