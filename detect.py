@@ -1,9 +1,12 @@
+import os
 import cv2
 
+
+CUR_DIR = os.path.dirname(__file__)
 # Carrega modelo pré-treinado (MobileNet SSD)
 net = cv2.dnn.readNetFromCaffe(
-    "mobilenet_ssd/MobileNetSSD_deploy.prototxt",
-    "mobilenet_ssd/mobilenet_iter_73000.caffemodel",
+    os.path.join(CUR_DIR, "mobilenet_ssd", "MobileNetSSD_deploy.prototxt"),
+    os.path.join(CUR_DIR, "mobilenet_ssd", "mobilenet_iter_73000.caffemodel"),
 )
 
 
