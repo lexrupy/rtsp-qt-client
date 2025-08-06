@@ -9,7 +9,6 @@ from qtcompat import QTimer, QImage, QImage_Format_RGB888, Qt_Compat_Qimage_Byte
 
 
 ALARM_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
-last_detection_time = 0
 # ALARM_FILE = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 
 
@@ -34,7 +33,6 @@ def iniciar_monitoramento(
         }
 
     def on_frame(viewer, qimage):
-        global last_detection_time
         agora = time.time()
         estado[viewer] = estado.get(viewer, {})
         estado[viewer]["last_frame_time"] = agora
@@ -45,28 +43,26 @@ def iniciar_monitoramento(
 
         height = qimage.height()
         width = qimage.width()
-        channels = 4 if qimage.hasAlphaChannel() else 3
+        arr = np.array(ptr).reshape(height, width, 4 if qimage.hasAlphaChannel() else 3)
 
-        arr = np.array(ptr).reshape(height, width, channels)
-
-        if channels == 4:
+        # Garante formato RGB (OpenCV usa BGR por padrão)
+        if arr.shape[2] == 4:
             arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
         else:
-            # se arr estiver BGR, converta para RGB
             arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
-
-        play_sound = False
 
         if viewer.detect_person:
             arr, person_detected = detect_person(arr)
-            if person_detected:
-                if agora - last_detection_time > 10:
-                    play_sound = True
-                    last_detection_time = agora
 
-                if viewer.alarm_on_detect:
-                    if play_sound:
+            # Detectou pessoa agora e não estava detectando antes
+            if person_detected and not getattr(viewer, "last_person_detected", False):
+                if time.time() - getattr(viewer, "last_detection_time", 0) > 10:
+                    viewer.last_detection_time = time.time()
+                    if viewer.alarm_on_detect:
                         subprocess.Popen(["paplay", ALARM_FILE])
+
+            # Atualiza o estado de presença
+            viewer.last_person_detected = person_detected
 
         # w_rect = width
         # h_rect = height
@@ -98,7 +94,6 @@ def iniciar_monitoramento(
         small = cv2.resize(gray, (64, 36))
 
         estado[viewer]["last_frame_img"] = small
-        estado[viewer]["last_frame_time"] = time.time()
 
     # Conectar sinais frame_ready para cada viewer
     for v in viewers:

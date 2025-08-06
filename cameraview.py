@@ -42,7 +42,9 @@ class CameraViewer(QLabel):
         self.setSizePolicy(QSizePolicy_Expanding, QSizePolicy_Expanding)
         self.setText("Conectando...")
         self.setStyleSheet("background-color: black; color: white; font-size: 16px;")
-        self.last_esc_time = 0
+        self.last_esc_time = time.time()
+        self.last_detection_time = time.time()
+        self.last_person_detected = False
         self.thread = None
         self.current_url = self.url_low
         self.connecting = False
