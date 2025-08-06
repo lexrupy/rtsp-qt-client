@@ -13,12 +13,11 @@ try:
         QInputDialog,
         QComboBox,
         QDialog,
-        QIcon,
         QMenu,
         QSplashScreen,
         QSizePolicy,
     )
-    from PyQt6.QtGui import QImage, QPixmap, QDrag, QAction
+    from PyQt6.QtGui import QImage, QPixmap, QDrag, QAction, QIcon
     from PyQt6.QtCore import (
         QTimer,
         Qt,
@@ -64,6 +63,9 @@ try:
 
     def Qt_Compat_GetMousePoint(e):
         return e.globalPosition().toPoint()
+
+    def Qt_Compat_Qimage_ByteCount(i):
+        return i.sizeInBytes()
 
 except:
     from PyQt5.QtWidgets import (
@@ -132,6 +134,9 @@ except:
     def Qt_Compat_GetMousePoint(e):
         return e.globalPos()
 
+    def Qt_Compat_Qimage_ByteCount(i):
+        return i.byteCount()
+
 
 __all__ = [
     "QApplication",
@@ -160,6 +165,8 @@ __all__ = [
     "QMimeData",
     "QThread",
     "QSizePolicy_Expanding",
+    "Qt_Compat_GetMousePoint",
+    "Qt_Compat_Qimage_ByteCount",
     "pyqtSignal",
     "QT_COMPAT_VERSION",
     "QT_VERSION_STR",

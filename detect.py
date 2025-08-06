@@ -1,14 +1,12 @@
 import os
 import cv2
 
-
 CUR_DIR = os.path.dirname(__file__)
 # Carrega modelo pré-treinado (MobileNet SSD)
 net = cv2.dnn.readNetFromCaffe(
     os.path.join(CUR_DIR, "mobilenet_ssd", "MobileNetSSD_deploy.prototxt"),
     os.path.join(CUR_DIR, "mobilenet_ssd", "mobilenet_iter_73000.caffemodel"),
 )
-
 
 # Classe 15 é 'person' no MobileNet SSD
 CLASSES = [
@@ -37,6 +35,11 @@ CLASSES = [
 
 
 def detect_person(frame):
+
+    # media_brilho = cv2.mean(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))[0]
+    # if media_brilho < 60:
+    #     frame = cv2.convertScaleAbs(frame, alpha=1.5, beta=30)
+
     h, w = frame.shape[:2]
     blob = cv2.dnn.blobFromImage(frame, 0.007843, (300, 300), 127.5)
     net.setInput(blob)

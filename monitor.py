@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 from detect import detect_person
-from qtcompat import QTimer, QImage
+from qtcompat import QTimer, QImage, QImage_Format_RGB888, Qt_Compat_Qimage_ByteCount
 
 
 ALARM_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
@@ -25,6 +25,14 @@ def iniciar_monitoramento(
     # Estrutura para armazenar estado externo
     estado = {}
 
+    def inicializar_estado(v):
+        estado[v] = {
+            "last_frame_time": time.time(),
+            "last_frame_img": None,
+            "dark_start": None,
+            "freeze_start": None,
+        }
+
     def on_frame(viewer, qimage):
         global last_detection_time
         agora = time.time()
@@ -33,7 +41,7 @@ def iniciar_monitoramento(
 
         # Converte QImage para numpy array (RGBA)
         ptr = qimage.bits()
-        ptr.setsize(qimage.byteCount())
+        ptr.setsize(Qt_Compat_Qimage_ByteCount(qimage))
 
         height = qimage.height()
         width = qimage.width()
@@ -79,7 +87,7 @@ def iniciar_monitoramento(
         h, w, ch = rgb_for_display.shape
         bytesPerLine = ch * w
         qimg_debug = QImage(
-            rgb_for_display.data, w, h, bytesPerLine, QImage.Format_RGB888
+            rgb_for_display.data, w, h, bytesPerLine, QImage_Format_RGB888
         ).copy()
 
         viewer.update_frame(qimg_debug)
@@ -96,16 +104,13 @@ def iniciar_monitoramento(
     for v in viewers:
         v._frame_handler = lambda img, viewer=v: on_frame(viewer, img)
         v.thread.frame_ready.connect(v._frame_handler)
-        estado[v] = {
-            "last_frame_time": time.time(),
-            "last_frame_img": None,
-            "dark_start": None,
-            "freeze_start": None,
-        }
+        inicializar_estado(v)
 
     def verificar():
         agora = time.time()
         for v in viewers:
+            if v not in estado:
+                inicializar_estado(v)
             est = estado[v]
             tempo_sem_frame = agora - est["last_frame_time"]
             if tempo_sem_frame > tempo_limite_travado:
