@@ -51,18 +51,33 @@ def iniciar_monitoramento(
         else:
             arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
 
+        # ---- DETECÇÃO ----
         if viewer.detect_person:
             arr, person_detected = detect_person(arr)
 
-            # Detectou pessoa agora e não estava detectando antes
-            if person_detected and not getattr(viewer, "last_person_detected", False):
-                if time.time() - getattr(viewer, "last_detection_time", 0) > 10:
-                    viewer.last_detection_time = time.time()
-                    if viewer.alarm_on_detect:
-                        subprocess.Popen(["paplay", ALARM_FILE])
+            # Inicializa variáveis de controle se não existirem
+            if not hasattr(viewer, "pessoa_presente"):
+                viewer.pessoa_presente = False
+                viewer.ultimo_tempo_presenca = 0
+                viewer.alarme_tocado = False
 
-            # Atualiza o estado de presença
-            viewer.last_person_detected = person_detected
+            if person_detected:
+                viewer.ultimo_tempo_presenca = agora
+
+                if not viewer.pessoa_presente:
+                    viewer.pessoa_presente = True
+                    if not viewer.alarme_tocado:
+                        viewer.alarme_tocado = True
+                        viewer.last_detection_time = agora
+                        if viewer.alarm_on_detect:
+                            subprocess.Popen(["paplay", ALARM_FILE])
+            else:
+                # Considera ausência se passou X segundos sem detecção
+                if viewer.pessoa_presente and (
+                    agora - viewer.ultimo_tempo_presenca > 3
+                ):
+                    viewer.pessoa_presente = False
+                    viewer.alarme_tocado = False
 
         # w_rect = width
         # h_rect = height

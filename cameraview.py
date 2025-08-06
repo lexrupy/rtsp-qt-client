@@ -43,8 +43,9 @@ class CameraViewer(QLabel):
         self.setText("Conectando...")
         self.setStyleSheet("background-color: black; color: white; font-size: 16px;")
         self.last_esc_time = time.time()
-        self.last_detection_time = time.time()
-        self.last_person_detected = False
+        self.pessoa_presente = False
+        self.ultimo_tempo_presenca = time.time()
+        self.alarme_tocado = False
         self.thread = None
         self.current_url = self.url_low
         self.connecting = False
