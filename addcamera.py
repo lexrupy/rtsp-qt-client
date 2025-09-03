@@ -12,7 +12,7 @@ from qtcompat import (
 
 
 class AddCameraDialog(QDialog):
-    def __init__(self, parent=None, stream_type="Auto", editing=False):
+    def __init__(self, parent=None, stream_type="Auto", editing=False, alarm_type="doorbell"):
         super().__init__(parent)
         self.edigint = editing
         if editing:
@@ -24,6 +24,7 @@ class AddCameraDialog(QDialog):
         self.low_url = ""
         self.high_url = ""
         self.stream_type = stream_type
+        self.alarm_type = alarm_type
 
         layout = QVBoxLayout(self)
 
@@ -50,18 +51,33 @@ class AddCameraDialog(QDialog):
 
         layout.addLayout(combo_layout)
 
+
+        # Novas opções: Detecção de pessoas e Alarme
+        self.detect_checkbox = QCheckBox("Detectar pessoas", self)
+        self.alarm_checkbox = QCheckBox("Soar alarme ao detectar pessoa", self)
+
+        layout.addWidget(self.detect_checkbox)
+
+
+        alarm_combo_layout = QHBoxLayout()
+        self.alarm_type_combo = QComboBox(self)
+        self.alarm_type_combo.addItems(
+            ["doorbell", "alarm"]
+        )
+        self.alarm_type_combo.setCurrentText(self.alarm_type)
+        alarm_combo_layout.addWidget(self.alarm_checkbox)
+        # alarm_combo_layout.addWidget(QLabel("Som:"))
+        alarm_combo_layout.addWidget(self.alarm_type_combo)
+
+        layout.addLayout(alarm_combo_layout)
+
+
         btn_layout = QHBoxLayout()
         self.ok_btn = QPushButton("OK", self)
         self.cancel_btn = QPushButton("Cancelar", self)
         btn_layout.addWidget(self.ok_btn)
         btn_layout.addWidget(self.cancel_btn)
         layout.addLayout(btn_layout)
-
-        # Novas opções: Detecção de pessoas e Alarme
-        self.detect_checkbox = QCheckBox("Detectar pessoas", self)
-        self.alarm_checkbox = QCheckBox("Soar alarme ao detectar pessoa", self)
-        layout.addWidget(self.detect_checkbox)
-        layout.addWidget(self.alarm_checkbox)
 
         self.ok_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
@@ -75,6 +91,7 @@ class AddCameraDialog(QDialog):
         self.low_url = low_url
         self.high_url = high_url
         self.stream_type = self.stream_type_combo.currentText()
+        self.alarm_type = self.alarm_type_combo.currentText()
         self.detect_person = self.detect_checkbox.isChecked()
         self.alarm_on_detect = self.alarm_checkbox.isChecked()
         super().accept()

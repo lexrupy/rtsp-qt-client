@@ -8,7 +8,9 @@ from detect import detect_person
 from qtcompat import QTimer, QImage, QImage_Format_RGB888, Qt_Compat_Qimage_ByteCount
 
 
-ALARM_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
+ALARM_FILE = os.path.join(os.path.dirname(__file__), "alarm.wav")
+DOORBEL_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
+ 
 # ALARM_FILE = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 
 
@@ -70,7 +72,10 @@ def iniciar_monitoramento(
                         viewer.alarme_tocado = True
                         viewer.last_detection_time = agora
                         if viewer.alarm_on_detect:
-                            subprocess.Popen(["paplay", ALARM_FILE])
+                            if viewer.alarm_type == "doorbell":
+                                subprocess.Popen(["paplay", DOORBEL_FILE])
+                            else:
+                                subprocess.Popen(["paplay", ALARM_FILE])
             else:
                 # Considera ausência se passou X segundos sem detecção
                 if viewer.pessoa_presente and (

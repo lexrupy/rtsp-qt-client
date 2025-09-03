@@ -68,12 +68,14 @@ class MosaicoRTSP(QWidget):
             stream_type = dlg.stream_type
             detect_person = dlg.detect_person
             alarm_on_detect = dlg.alarm_on_detect
+            alarm_type = dlg.alarm_type
             self.add_camera_with_urls(
                 low_url,
                 high_url,
                 stream_type=stream_type,
                 detect_person=detect_person,
                 alarm_on_detect=alarm_on_detect,
+                alarm_type=alarm_type,
             )
 
     def copy_camera_dialog(self):
@@ -85,7 +87,7 @@ class MosaicoRTSP(QWidget):
         if not cam_data:
             return
 
-        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"])
+        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"], alarm_type=cam_data["alarm_type"])
         dlg.low_url_edit.setText(cam_data["url_low"])
         dlg.high_url_edit.setText(cam_data["url_high"])
         dlg.detect_checkbox.setChecked(cam_data.get("detect_person", False))
@@ -97,12 +99,14 @@ class MosaicoRTSP(QWidget):
             stream_type = dlg.stream_type
             detect_person = dlg.detect_person
             alarm_on_detect = dlg.alarm_on_detect
+            alarm_type = dlg.alarm_type
             self.add_camera_with_urls(
                 low_url,
                 high_url,
                 stream_type=stream_type,
                 detect_person=detect_person,
                 alarm_on_detect=alarm_on_detect,
+                alarm_type=alarm_type
             )
 
     def edit_camera_dialog(self):
@@ -113,7 +117,7 @@ class MosaicoRTSP(QWidget):
         cam_data = next((c for c in self.cameras if c["id"] == cam_id), None)
         if not cam_data:
             return
-        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"], editing=True)
+        dlg = AddCameraDialog(self, stream_type=cam_data["stream_type"], editing=True, alarm_type=cam_data["alarm_type"])
         dlg.low_url_edit.setText(cam_data["url_low"])
         dlg.high_url_edit.setText(cam_data["url_high"])
         dlg.detect_checkbox.setChecked(cam_data.get("detect_person", False))
@@ -124,6 +128,7 @@ class MosaicoRTSP(QWidget):
             cam_data["stream_type"] = dlg.stream_type
             cam_data["detect_person"] = dlg.detect_person
             cam_data["alarm_on_detect"] = dlg.alarm_on_detect
+            cam_data["alarm_type"] = dlg.alarm_type
             self.save_config()
 
             self.reload_cameras()
@@ -135,6 +140,7 @@ class MosaicoRTSP(QWidget):
         stream_type="Auto",
         detect_person=False,
         alarm_on_detect=False,
+        alarm_type="doorbell"
     ):
         # Acha um ID disponível para a nova câmera, ex: o próximo inteiro livre
         new_cam_id = max(cam["id"] for cam in self.cameras) + 1 if self.cameras else 1
@@ -146,6 +152,7 @@ class MosaicoRTSP(QWidget):
                 "stream_type": stream_type,
                 "detect_person": detect_person,
                 "alarm_on_detect": alarm_on_detect,
+                "alarm_type": alarm_type
             }
         )
         self.save_config()
@@ -362,6 +369,7 @@ class MosaicoRTSP(QWidget):
             alarm_on_detect = self.config.getboolean(
                 section, "alarm_on_detect", fallback=False
             )
+            alarm_type = self.config.get(section, "alarm_type", fallback="doorbell")
 
             if not url_low or not url_high:
                 continue
@@ -374,6 +382,7 @@ class MosaicoRTSP(QWidget):
                     "stream_type": stream_type,
                     "detect_person": detect_person,
                     "alarm_on_detect": alarm_on_detect,
+                    "alarm_type": alarm_type
                 }
             )
 
@@ -397,6 +406,7 @@ class MosaicoRTSP(QWidget):
             self.config.set(
                 section, "alarm_on_detect", str(cam.get("alarm_on_detect", ""))
             )
+            self.config.set(section, "alarm_type", str(cam.get("alarm_type", "doorbell")))
 
         config_dir = os.path.dirname(CONFIG_FILE)
         os.makedirs(config_dir, exist_ok=True)
