@@ -495,12 +495,14 @@ class MosaicoRTSP(QWidget):
             stream_type = cam["stream_type"]
             detect_person = cam["detect_person"]
             alarm_on_detect = cam["alarm_on_detect"]
+            alarm_type = cam["alarm_type"]
 
             viewer = existing_viewers.get(cam_id)
 
             if viewer:
                 viewer.detect_person = detect_person
                 viewer.alarm_on_detect = alarm_on_detect
+                viewer.alarm_type = alarm_type
                 # Reconectar só se a URL mudou
                 if viewer.current_url != cam_url:
                     viewer.reconnect_with(new_url=cam_url)
@@ -515,6 +517,7 @@ class MosaicoRTSP(QWidget):
                     stream_type,
                     detect_person,
                     alarm_on_detect,
+                    alarm_type
                 )
 
             row = index // self.cols

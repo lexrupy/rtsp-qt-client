@@ -26,6 +26,7 @@ class CameraViewer(QLabel):
         stream_type="Auto",
         detect_person=False,
         alarm_on_detect=False,
+        alarm_type="doorbell"
     ):
         super().__init__()
         self.camera_id = camera
@@ -47,6 +48,7 @@ class CameraViewer(QLabel):
         self.ultimo_tempo_presenca = time.time()
         self.alarme_tocado = False
         self.thread = None
+        self.alarm_type = alarm_type
         self.current_url = self.url_low
         self.connecting = False
         self.init_capture()
