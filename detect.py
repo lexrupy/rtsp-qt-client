@@ -1,7 +1,9 @@
-import os
+import numpy as np
 import cv2
+import os
 
 CUR_DIR = os.path.dirname(__file__)
+
 # Carrega modelo pré-treinado (MobileNet SSD)
 net = cv2.dnn.readNetFromCaffe(
     os.path.join(CUR_DIR, "mobilenet_ssd", "MobileNetSSD_deploy.prototxt"),
@@ -35,11 +37,6 @@ CLASSES = [
 
 
 def detect_person(frame):
-
-    # media_brilho = cv2.mean(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))[0]
-    # if media_brilho < 60:
-    #     frame = cv2.convertScaleAbs(frame, alpha=1.5, beta=30)
-
     h, w = frame.shape[:2]
     blob = cv2.dnn.blobFromImage(frame, 0.007843, (300, 300), 127.5)
     net.setInput(blob)
@@ -52,14 +49,30 @@ def detect_person(frame):
         if confidence > 0.6:
             idx = int(detections[0, 0, i, 1])
             if CLASSES[idx] == "person":
-                person_detected = True
-                box = detections[0, 0, i, 3:7] * [w, h, w, h]
+                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+
+                # ignora valores inválidos
+                if np.any(np.isnan(box)):
+                    continue
+
                 (startX, startY, endX, endY) = box.astype("int")
+
+                # clamping para ficar dentro da imagem
+                startX = max(0, min(startX, w - 1))
+                endX   = max(0, min(endX, w - 1))
+                startY = max(0, min(startY, h - 1))
+                endY   = max(0, min(endY, h - 1))
+
+                # ignora caixas vazias ou invertidas
+                if endX <= startX or endY <= startY:
+                    continue
+
+                person_detected = True
                 cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
                 cv2.putText(
                     frame,
                     f"Pessoa: {confidence:.2f}",
-                    (startX, startY - 10),
+                    (startX, max(0, startY - 10)),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5,
                     (0, 255, 0),
@@ -67,3 +80,4 @@ def detect_person(frame):
                 )
 
     return frame, person_detected
+
