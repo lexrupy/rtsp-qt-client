@@ -42,7 +42,13 @@ class CameraThread(QThread):
             image = QImage(rgb.data, w, h, bytesPerLine, QImage_Format_RGB888).copy()
             self.frame_ready.emit(image)
 
-        self.cap.release()
+        if self.cap is not None and hasattr(self.cap, "release"):
+            try:
+                self.cap.release()
+            except Exception as e:
+                    print(f"[Camera] Erro ao liberar cap: {e}")
+            finally:
+                 self.cap = None
         self.stopped.emit()
 
     def configure_cap(self):
