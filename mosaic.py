@@ -305,7 +305,13 @@ class MosaicoRTSP(QWidget):
 
     def closeEvent(self, event):
         for viewer in self.viewers:
-            viewer.close()
+            if viewer.thread:
+                viewer._disconnect_thread(viewer.thread)
+                viewer.thread.stop()
+        for viewer in self.viewers:
+            if viewer.thread:
+                viewer.thread.wait(3000)
+                viewer.thread = None
         event.accept()
 
     def keyPressEvent(self, event):
