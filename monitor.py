@@ -23,7 +23,6 @@ def iniciar_monitoramento(
     similaridade_minima=0.999999,
 ):
 
-    # Estrutura para armazenar estado externo
     estado = {}
 
     def inicializar_estado(v):
@@ -34,30 +33,40 @@ def iniciar_monitoramento(
             "freeze_start": None,
         }
 
-    def on_frame(viewer, qimage):
-        agora = time.time()
-        estado[viewer] = estado.get(viewer, {})
-        estado[viewer]["last_frame_time"] = agora
-
-        # Converte QImage para numpy array (RGBA)
+    def _thumbnail_from_qimage(qimage):
         ptr = qimage.bits()
         ptr.setsize(Qt_Compat_Qimage_ByteCount(qimage))
-
         height = qimage.height()
         width = qimage.width()
-        arr = np.array(ptr).reshape(height, width, 4 if qimage.hasAlphaChannel() else 3)
-
-        # Garante formato RGB (OpenCV usa BGR por padrão)
+        arr = np.array(ptr).reshape(
+            height, width, 4 if qimage.hasAlphaChannel() else 3
+        )
         if arr.shape[2] == 4:
             arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
-        else:
-            arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+        gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+        return cv2.resize(gray, (64, 36))
 
-        # ---- DETECÇÃO ----
+    def on_frame(viewer, qimage):
+        agora = time.time()
+        est = estado.setdefault(viewer, {})
+        est["last_frame_time"] = agora
+
         if viewer.detect_person:
+            ptr = qimage.bits()
+            ptr.setsize(Qt_Compat_Qimage_ByteCount(qimage))
+            height = qimage.height()
+            width = qimage.width()
+            arr = np.array(ptr).reshape(
+                height, width, 4 if qimage.hasAlphaChannel() else 3
+            )
+
+            if arr.shape[2] == 4:
+                arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+            else:
+                arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+
             arr, person_detected = detect_person(arr)
 
-            # Inicializa variáveis de controle se não existirem
             if not hasattr(viewer, "pessoa_presente"):
                 viewer.pessoa_presente = False
                 viewer.ultimo_tempo_presenca = 0
@@ -65,7 +74,6 @@ def iniciar_monitoramento(
 
             if person_detected:
                 viewer.ultimo_tempo_presenca = agora
-
                 if not viewer.pessoa_presente:
                     viewer.pessoa_presente = True
                     if not viewer.alarme_tocado:
@@ -77,43 +85,28 @@ def iniciar_monitoramento(
                             else:
                                 subprocess.Popen(["paplay", ALARM_FILE])
             else:
-                # Considera ausência se passou X segundos sem detecção
                 if viewer.pessoa_presente and (
                     agora - viewer.ultimo_tempo_presenca > 3
                 ):
                     viewer.pessoa_presente = False
                     viewer.alarme_tocado = False
 
-        # w_rect = width
-        # h_rect = height
+            gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+            est["last_frame_img"] = cv2.resize(gray, (64, 36))
 
-        w_rect = 350
-        h_rect = 60
+            rgb_display = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb_display.shape
+            qimg_display = QImage(
+                rgb_display.data, w, h, ch * w, QImage_Format_RGB888
+            ).copy()
+            viewer.update_frame(qimg_display)
+        else:
+            viewer.update_frame(qimage)
 
-        x_start = max(0, width - w_rect)
-        y_start = 5
-        x_end = width - 1
-        y_end = h_rect - 1
-
-        # Debug Rect
-        # cv2.rectangle(arr, (x_start, y_start), (x_end, y_end), (0, 0, 255), 2)
-
-        # Agora converte para QImage normalmente para exibir
-        rgb_for_display = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
-        h, w, ch = rgb_for_display.shape
-        bytesPerLine = ch * w
-        qimg_debug = QImage(
-            rgb_for_display.data, w, h, bytesPerLine, QImage_Format_RGB888
-        ).copy()
-
-        viewer.update_frame(qimg_debug)
-
-        # Aqui para análise, recorte sem o retângulo original:
-        cropped = arr[y_start : y_end + 1, x_start : x_end + 1]
-        gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-        small = cv2.resize(gray, (64, 36))
-
-        estado[viewer]["last_frame_img"] = small
+            last_thumb = est.get("_thumb_time", 0)
+            if est["last_frame_img"] is None or (agora - last_thumb) >= 2:
+                est["last_frame_img"] = _thumbnail_from_qimage(qimage)
+                est["_thumb_time"] = agora
 
     def conectar_viewer(v):
         v._frame_handler = lambda img, viewer=v: on_frame(viewer, img)

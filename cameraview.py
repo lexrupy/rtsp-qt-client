@@ -8,7 +8,7 @@ from qtcompat import (
     QSizePolicy_Expanding,
     Qt_AlignmentFlag_AlignCenter,
     Qt_AspectRatioMode_KeepAspectRatio,
-    Qt_TransformationMode_SmoothTransformation,
+                Qt_TransformationMode_FastTransformation,
     Qt_LeftButton,
     Qt_MoveAction,
     Qt_Compat_GetMousePoint,
@@ -121,7 +121,7 @@ class CameraViewer(QLabel):
             QPixmap.fromImage(img).scaled(
                 self.size(),
                 Qt_AspectRatioMode_KeepAspectRatio,
-                Qt_TransformationMode_SmoothTransformation,
+    Qt_TransformationMode_FastTransformation,
             )
         )
 
