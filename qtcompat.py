@@ -39,6 +39,9 @@ try:
     Qt_TransformationMode_SmoothTransformation = (
         Qt.TransformationMode.SmoothTransformation
     )
+    Qt_TransformationMode_FastTransformation = (
+        Qt.TransformationMode.FastTransformation
+    )
 
     Qt_Key_F = Qt.Key.Key_F
     Qt_Key_F11 = Qt.Key.Key_F11
@@ -104,6 +107,9 @@ except:
     Qt_AspectRatioMode_KeepAspectRatio = Qt.AspectRatioMode.KeepAspectRatio
     Qt_TransformationMode_SmoothTransformation = (
         Qt.TransformationMode.SmoothTransformation
+    )
+    Qt_TransformationMode_FastTransformation = (
+        Qt.TransformationMode.FastTransformation
     )
 
     Qt_AlignmentFlag_AlignBottom = Qt.AlignBottom
