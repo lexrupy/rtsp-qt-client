@@ -146,10 +146,11 @@ class CameraViewer(QLabel):
                         f"[Camera {self.camera_id}] Thread travada ao desativar"
                     )
                 self.thread = None
+            self.setScaledContents(False)
+            self.clear()
             self.setText("Desativada")
-            self.setPixmap(QPixmap())
             self.setStyleSheet(
-                "background-color: #333; color: #999; font-size: 18px;"
+                "background-color: #333; color: white; font-size: 20px; font-weight: bold;"
             )
         else:
             self.setText("Conectando...")
