@@ -114,9 +114,10 @@ def iniciar_monitoramento(
                 est["_thumb_time"] = agora
 
     def conectar_viewer(v):
-        v._frame_handler = lambda img, viewer=v: on_frame(viewer, img)
-        v.thread.frame_ready.connect(v._frame_handler)
         inicializar_estado(v)
+        v._frame_handler = lambda img, viewer=v: on_frame(viewer, img)
+        if not getattr(v, "disabled", False) and v.thread is not None:
+            v.thread.frame_ready.connect(v._frame_handler)
 
     for v in viewers:
         conectar_viewer(v)
