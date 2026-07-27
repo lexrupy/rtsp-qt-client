@@ -212,23 +212,22 @@ class MosaicoRTSP(QWidget):
                 self.layout.removeWidget(widget)
 
     def swap_viewers(self, viewer1, viewer2):
+        self.setUpdatesEnabled(False)
+
         r1, c1 = self.original_positions[viewer1]
         r2, c2 = self.original_positions[viewer2]
 
-        # Troca os widgets no layout
         self.layout.removeWidget(viewer1)
         self.layout.removeWidget(viewer2)
 
         self.layout.addWidget(viewer1, r2, c2)
         self.layout.addWidget(viewer2, r1, c1)
 
-        # Atualiza posições no dicionário
         self.original_positions[viewer1], self.original_positions[viewer2] = (r2, c2), (
             r1,
             c1,
         )
 
-        # --- Atualiza a lista self.cameras para persistir ordem ---
         idx1 = next(
             i for i, cam in enumerate(self.cameras) if cam["id"] == viewer1.camera_id
         )
@@ -237,7 +236,6 @@ class MosaicoRTSP(QWidget):
         )
         self.cameras[idx1], self.cameras[idx2] = self.cameras[idx2], self.cameras[idx1]
 
-        # atualize também self.viewers para manter coerência
         idx_v1 = self.viewers.index(viewer1)
         idx_v2 = self.viewers.index(viewer2)
         self.viewers[idx_v1], self.viewers[idx_v2] = (
@@ -245,6 +243,8 @@ class MosaicoRTSP(QWidget):
             self.viewers[idx_v1],
         )
 
+        self.setUpdatesEnabled(True)
+        self.update()
         self._schedule_save()
 
     def reorganize_grid(self):
