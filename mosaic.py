@@ -604,6 +604,7 @@ class MosaicoRTSP(QWidget):
             self.remove_camera(cam)
 
     def reload_cameras(self):
+        QApplication.processEvents()
         # Mapeia viewers existentes por ID
         existing_viewers = {v.camera_id: v for v in self.viewers}
         self.original_positions.clear()
