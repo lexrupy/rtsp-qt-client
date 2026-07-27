@@ -370,6 +370,7 @@ class MosaicoRTSP(QWidget):
                 section, "alarm_on_detect", fallback=False
             )
             alarm_type = self.config.get(section, "alarm_type", fallback="doorbell")
+            disabled = self.config.getboolean(section, "disabled", fallback=False)
 
             if not url_low or not url_high:
                 continue
@@ -382,7 +383,8 @@ class MosaicoRTSP(QWidget):
                     "stream_type": stream_type,
                     "detect_person": detect_person,
                     "alarm_on_detect": alarm_on_detect,
-                    "alarm_type": alarm_type
+                    "alarm_type": alarm_type,
+                    "disabled": disabled
                 }
             )
 
@@ -407,6 +409,7 @@ class MosaicoRTSP(QWidget):
                 section, "alarm_on_detect", str(cam.get("alarm_on_detect", ""))
             )
             self.config.set(section, "alarm_type", str(cam.get("alarm_type", "doorbell")))
+            self.config.set(section, "disabled", str(cam.get("disabled", False)))
 
         config_dir = os.path.dirname(CONFIG_FILE)
         os.makedirs(config_dir, exist_ok=True)
@@ -435,6 +438,18 @@ class MosaicoRTSP(QWidget):
             remove_action.setEnabled(True)
             edit_action.setEnabled(True)
             copy_action.setEnabled(True)
+            if widget_clicado.disabled:
+                reativar_action = QAction("Reativar", self)
+                reativar_action.triggered.connect(
+                    lambda: widget_clicado.set_disabled(False)
+                )
+                menu.addAction(reativar_action)
+            else:
+                desativar_action = QAction("Desativar", self)
+                desativar_action.triggered.connect(
+                    lambda: widget_clicado.set_disabled(True)
+                )
+                menu.addAction(desativar_action)
         else:
             self.selected_viewer = None
             remove_action.setEnabled(False)
@@ -448,6 +463,12 @@ class MosaicoRTSP(QWidget):
         menu.addAction(about_action)
         menu.addAction(exit_action)
         menu.exec(event.globalPos())
+
+    def on_camera_disabled(self, cam_id, state):
+        cam_data = next((c for c in self.cameras if c["id"] == cam_id), None)
+        if cam_data:
+            cam_data["disabled"] = state
+            self.save_config()
 
     def reconnect_all_cameras(self):
         for viewer in self.viewers:
@@ -496,6 +517,7 @@ class MosaicoRTSP(QWidget):
             detect_person = cam["detect_person"]
             alarm_on_detect = cam["alarm_on_detect"]
             alarm_type = cam["alarm_type"]
+            disabled = cam.get("disabled", False)
 
             viewer = existing_viewers.get(cam_id)
 
@@ -503,13 +525,13 @@ class MosaicoRTSP(QWidget):
                 viewer.detect_person = detect_person
                 viewer.alarm_on_detect = alarm_on_detect
                 viewer.alarm_type = alarm_type
-                # Reconectar só se a URL mudou
-                if viewer.current_url != cam_url:
+                if viewer.disabled != disabled:
+                    viewer.set_disabled(disabled)
+                if not disabled and viewer.current_url != cam_url:
                     viewer.reconnect_with(new_url=cam_url)
 
-                existing_viewers.pop(cam_id)  # Remove da lista de existentes
+                existing_viewers.pop(cam_id)
             else:
-                # Criar novo viewer
                 viewer = CameraViewer(
                     cam_id,
                     cam_url,
@@ -521,6 +543,8 @@ class MosaicoRTSP(QWidget):
                 )
                 if hasattr(self, 'conectar_viewer'):
                     self.conectar_viewer(viewer)
+                if disabled:
+                    viewer.set_disabled(True)
 
             row = index // self.cols
             col = index % self.cols

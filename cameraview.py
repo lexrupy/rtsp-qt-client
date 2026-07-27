@@ -1,13 +1,10 @@
 import time
 from qtcompat import (
     QLabel,
-    QPushButton,
     QPixmap,
     QApplication,
     QDrag,
     QMimeData,
-    QIcon,
-    QStyle,
     QSizePolicy_Expanding,
     Qt_AlignmentFlag_AlignCenter,
     Qt_AspectRatioMode_KeepAspectRatio,
@@ -58,7 +55,6 @@ class CameraViewer(QLabel):
         self.current_url = self.url_low
         self.connecting = False
         self.disabled = False
-        self.restart_btn = None
         self.init_capture()
 
     def init_capture(self):
@@ -151,9 +147,7 @@ class CameraViewer(QLabel):
             self.setStyleSheet(
                 "background-color: #333; color: #999; font-size: 18px;"
             )
-            self._create_restart_button()
         else:
-            self._remove_restart_button()
             self.setText("Conectando...")
             self.setStyleSheet(
                 "background-color: black; color: white; font-size: 16px;"
@@ -164,44 +158,6 @@ class CameraViewer(QLabel):
         if hasattr(parent, 'on_camera_disabled'):
             parent.on_camera_disabled(self.camera_id, state)
 
-    def _create_restart_button(self):
-        self._remove_restart_button()
-        self.restart_btn = QPushButton(self)
-        icon = QIcon.fromTheme(
-            "view-refresh",
-            self.style().standardIcon(QStyle.SP_BrowserReload)
-        )
-        self.restart_btn.setIcon(icon)
-        self.restart_btn.setIconSize(self.restart_btn.sizeHint())
-        self.restart_btn.setFixedSize(32, 32)
-        self.restart_btn.setToolTip("Reativar câmera")
-        self.restart_btn.setStyleSheet(
-            "QPushButton { background-color: rgba(255,255,255,180);"
-            " border-radius: 16px; }"
-            "QPushButton:hover { background-color: rgba(255,255,255,230); }"
-        )
-        self.restart_btn.clicked.connect(lambda: self.set_disabled(False))
-        self.restart_btn.show()
-        self._position_restart_button()
-
-    def _remove_restart_button(self):
-        if self.restart_btn:
-            self.restart_btn.deleteLater()
-            self.restart_btn = None
-
-    def _position_restart_button(self):
-        if self.restart_btn:
-            self.restart_btn.move(
-                self.width() - self.restart_btn.width() - 6,
-                self.height() - self.restart_btn.height() - 6,
-            )
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._position_restart_button()
-        self.update()
-        self.updateGeometry()
-
     def close(self):
         if self.thread:
             self._disconnect_thread(self.thread)
@@ -211,7 +167,6 @@ class CameraViewer(QLabel):
                     f"[Camera {self.camera_id}] Thread travada no close, abandonando..."
                 )
             self.thread = None
-        self._remove_restart_button()
         super().close()
 
     def mouseDoubleClickEvent(self, event):
