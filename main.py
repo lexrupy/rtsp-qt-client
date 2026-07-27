@@ -51,7 +51,16 @@ if __name__ == "__main__":
 
     QApplication.processEvents()
 
-    window = MosaicoRTSP()
+    window = MosaicoRTSP(
+        splash_msg=lambda msg: (
+            splash.showMessage(
+                msg,
+                Qt_AlignmentFlag_AlignBottom | Qt_AlignmentFlag_AlignCenter,
+                Qt_Color_White,
+            ),
+            QApplication.processEvents(),
+        )
+    )
     window.showMaximized()
 
     timer = QTimer()

@@ -35,10 +35,11 @@ CONFIG_FILE = os.path.expanduser("~/.config/rtsp-qt-client/config.ini")
 
 
 class MosaicoRTSP(QWidget):
-    def __init__(self):
+    def __init__(self, splash_msg=None):
         super().__init__()
         self.cameras = []
         self.config = configparser.ConfigParser()
+        self._splash_msg = splash_msg
         self.load_config()
         self.setMinimumSize(600, 408)
         self.setSizePolicy(QSizePolicy_Expanding, QSizePolicy_Expanding)
@@ -656,6 +657,13 @@ class MosaicoRTSP(QWidget):
                     self.conectar_viewer(viewer)
                 if disabled:
                     viewer.set_disabled(True)
+
+                if self._splash_msg:
+                    self._splash_msg(
+                        f"Carregando câmera {cam_id} ({index + 1}/{len(visiveis)})..."
+                    )
+
+            QApplication.processEvents()
 
             row = index // self.cols
             col = index % self.cols
