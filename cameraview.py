@@ -100,7 +100,19 @@ class CameraViewer(QLabel):
         old_thread = self.thread
         self._disconnect_thread(old_thread)
         old_thread.stop()
-        old_thread.deleteLater()
+
+        pending = getattr(self, "_pending_threads", None)
+        if pending is None:
+            self._pending_threads = []
+        self._pending_threads.append(old_thread)
+
+        def _cleanup(th):
+            th.deleteLater()
+            pending = getattr(self, "_pending_threads", None)
+            if pending is not None and th in pending:
+                pending.remove(th)
+
+        old_thread.finished.connect(lambda: _cleanup(old_thread))
 
         self.thread = CameraThread(self.current_url, self.stream_type)
         self.thread.frame_ready.connect(self.update_frame)
