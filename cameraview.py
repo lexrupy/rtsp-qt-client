@@ -114,6 +114,8 @@ class CameraViewer(QLabel):
         self.thread.start()
 
     def update_frame(self, img):
+        if self.disabled:
+            return
         self._ultimo_frame_ts = time.time()
         if self.connecting:
             self.connecting = False
@@ -127,6 +129,8 @@ class CameraViewer(QLabel):
         )
 
     def show_connection_error(self):
+        if self.disabled:
+            return
         self.connecting = False
         self.setText("Erro ao conectar")
         self.setPixmap(QPixmap())
