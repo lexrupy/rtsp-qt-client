@@ -85,7 +85,6 @@ class CameraThread(QThread):
 
     def stop(self):
         self.running = False
-        self._release_cap()
 
     def _release_cap(self):
         if self.cap is not None:
