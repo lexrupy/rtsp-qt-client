@@ -83,21 +83,6 @@ class CameraThread(QThread):
         except Exception:
             pass
 
-    def restart_with(self, url, force=False):
-        if not force and url == self.url:
-            return
-
-        self.stop()
-        if self.isRunning():
-            if not self.wait(READ_TIMEOUT_MSEC + 2000):
-                print(f"[Camera] Thread travada, forçando termino...")
-                self.terminate()
-                self.wait(3000)
-
-        self.url = url
-        self.running = True
-        self.start()
-
     def stop(self):
         self.running = False
         self._release_cap()

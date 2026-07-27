@@ -17,6 +17,9 @@ from qtcompat import (
 from camera import CameraThread, READ_TIMEOUT_MSEC
 
 
+THREAD_STOP_TIMEOUT = READ_TIMEOUT_MSEC + 5000
+
+
 class CameraViewer(QLabel):
     def __init__(
         self,
@@ -55,11 +58,25 @@ class CameraViewer(QLabel):
 
     def init_capture(self):
         self.connecting = True
-        self.setPixmap(QPixmap())  # limpa imagem antiga
+        self.setPixmap(QPixmap())
         self.thread = CameraThread(self.current_url, self.stream_type)
         self.thread.frame_ready.connect(self.update_frame)
         self.thread.connection_failed.connect(self.show_connection_error)
+        self._reconnect_monitor()
         self.thread.start()
+
+    def _disconnect_thread(self, thread):
+        try:
+            thread.frame_ready.disconnect(self.update_frame)
+            thread.connection_failed.disconnect(self.show_connection_error)
+            if hasattr(self, '_frame_handler'):
+                thread.frame_ready.disconnect(self._frame_handler)
+        except TypeError:
+            pass
+
+    def _reconnect_monitor(self):
+        if hasattr(self, '_frame_handler') and self._frame_handler is not None:
+            self.thread.frame_ready.connect(self._frame_handler)
 
     def change_res(self, res=0):
         new_url = self.url_high if res == 0 else self.url_low
@@ -69,20 +86,37 @@ class CameraViewer(QLabel):
         new_url = new_url or self.current_url
 
         if not force and new_url == self.current_url:
-            return  # Nada mudou
+            return
 
         self.current_url = new_url
 
         if self.thread:
-            self.thread.restart_with(new_url, force=force)
+            self._replace_thread()
         else:
             self.init_capture()
+
+    def _replace_thread(self):
+        old_thread = self.thread
+        self._disconnect_thread(old_thread)
+        old_thread.stop()
+
+        if old_thread.wait(THREAD_STOP_TIMEOUT):
+            old_thread.deleteLater()
+        else:
+            print(f"[Camera {self.camera_id}] Thread travada, substituindo...")
+            old_thread.deleteLater()
+
+        self.thread = CameraThread(self.current_url, self.stream_type)
+        self.thread.frame_ready.connect(self.update_frame)
+        self.thread.connection_failed.connect(self.show_connection_error)
+        self._reconnect_monitor()
+        self.thread.start()
 
     def update_frame(self, img):
         self._ultimo_frame_ts = time.time()
         if self.connecting:
             self.connecting = False
-            self.setText("")  # esconde texto conectando
+            self.setText("")
         self.setPixmap(
             QPixmap.fromImage(img).scaled(
                 self.size(),
@@ -94,15 +128,14 @@ class CameraViewer(QLabel):
     def show_connection_error(self):
         self.connecting = False
         self.setText("Erro ao conectar")
-        self.setPixmap(QPixmap())  # limpa imagem
+        self.setPixmap(QPixmap())
 
     def close(self):
         if self.thread:
+            self._disconnect_thread(self.thread)
             self.thread.stop()
-            if not self.thread.wait(READ_TIMEOUT_MSEC + 2000):
-                print(f"[Camera {self.camera_id}] Thread travada, forçando termino...")
-                self.thread.terminate()
-                self.thread.wait(3000)
+            if not self.thread.wait(THREAD_STOP_TIMEOUT):
+                print(f"[Camera {self.camera_id}] Thread travada no close, abandonando...")
             self.thread = None
         super().close()
 
