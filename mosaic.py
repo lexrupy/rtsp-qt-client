@@ -413,8 +413,12 @@ class MosaicoRTSP(QWidget):
 
         config_dir = os.path.dirname(CONFIG_FILE)
         os.makedirs(config_dir, exist_ok=True)
-        with open(CONFIG_FILE, "w") as f:
+        tmp = CONFIG_FILE + ".tmp"
+        with open(tmp, "w") as f:
             self.config.write(f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, CONFIG_FILE)
 
     def contextMenuEvent(self, event):
         widget_clicado = self.childAt(event.pos())
