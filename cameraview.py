@@ -207,11 +207,11 @@ class CameraViewer(QLabel):
             mime.setText(str(self.camera_id))
             drag.setMimeData(mime)
             pix = self.grab()
-            drag.setPixmap(pix.scaled(
-                pix.width() // 2, pix.height() // 2,
+            thumb = pix.scaled(
+                200, 150,
                 Qt_AspectRatioMode_KeepAspectRatio,
                 Qt_TransformationMode_FastTransformation,
-            ))
-            hot = Qt_Compat_GetMousePoint(e) - self.mapToGlobal(self.rect().topLeft())
-            drag.setHotSpot(hot)
+            )
+            drag.setPixmap(thumb)
+            drag.setHotSpot(thumb.rect().center())
             drag.exec(Qt_MoveAction)
