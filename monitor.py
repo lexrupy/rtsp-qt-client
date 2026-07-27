@@ -10,8 +10,8 @@ from qtcompat import QTimer, QImage, QImage_Format_RGB888, Qt_Compat_Qimage_Byte
 
 ALARM_FILE = os.path.join(os.path.dirname(__file__), "alarm.wav")
 DOORBEL_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
- 
-# ALARM_FILE = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
+
+MAX_RETRIES = 3
 
 
 def iniciar_monitoramento(
@@ -31,6 +31,7 @@ def iniciar_monitoramento(
             "last_frame_img": None,
             "dark_start": None,
             "freeze_start": None,
+            "retry_count": 0,
         }
 
     def _thumbnail_from_qimage(qimage):
@@ -50,6 +51,10 @@ def iniciar_monitoramento(
         agora = time.time()
         est = estado.setdefault(viewer, {})
         est["last_frame_time"] = agora
+        est["retry_count"] = 0
+
+        if getattr(viewer, "disabled", False):
+            return
 
         if viewer.detect_person:
             ptr = qimage.bits()
@@ -113,22 +118,36 @@ def iniciar_monitoramento(
         v.thread.frame_ready.connect(v._frame_handler)
         inicializar_estado(v)
 
-    # Conectar sinais frame_ready para cada viewer
     for v in viewers:
         conectar_viewer(v)
+
+    def _reconnect_or_disable(v, motivo):
+        est = estado[v]
+        est["retry_count"] = est.get("retry_count", 0) + 1
+        if est["retry_count"] >= MAX_RETRIES:
+            print(
+                f"[Monitor] Câmera {v.camera_id} desativada após {MAX_RETRIES} tentativas ({motivo})"
+            )
+            v.set_disabled(True)
+        else:
+            print(
+                f"[Monitor {motivo}] Câmera {v.camera_id} (tentativa {est['retry_count']}/{MAX_RETRIES}). Reconectando."
+            )
+            v.reconnect_with(force=True)
 
     def verificar():
         agora = time.time()
         for v in viewers:
+            if getattr(v, "disabled", False):
+                continue
+
             if v not in estado:
                 inicializar_estado(v)
             est = estado[v]
+
             tempo_sem_frame = agora - est["last_frame_time"]
             if tempo_sem_frame > tempo_limite_travado:
-                print(
-                    f"[Monitor nofrm] Câmera {v.camera_id} travada (sem frame {tempo_sem_frame:.1f}s). Reconectando."
-                )
-                v.reconnect_with(force=True)
+                _reconnect_or_disable(v, "nofrm")
                 est["last_frame_time"] = agora
                 est["dark_start"] = None
                 est["freeze_start"] = None
@@ -142,10 +161,7 @@ def iniciar_monitoramento(
                 if est["dark_start"] is None:
                     est["dark_start"] = agora
                 elif agora - est["dark_start"] > tempo_limite_escuro:
-                    print(
-                        f"[Monitor blk] Câmera {v.camera_id} com imagem escura persistente. Reconectando."
-                    )
-                    v.reconnect_with(force=True)
+                    _reconnect_or_disable(v, "blk")
                     est["dark_start"] = None
                     est["freeze_start"] = None
                     est["last_frame_time"] = agora
@@ -153,7 +169,6 @@ def iniciar_monitoramento(
             else:
                 est["dark_start"] = None
 
-            # Verificar congelamento (frame repetido)
             last_img = est.get("prev_img")
             if last_img is not None:
                 diff = (
@@ -164,17 +179,13 @@ def iniciar_monitoramento(
                     )
                     / 255
                 )
-
                 similar = 1 - diff
 
                 if similar > similaridade_minima:
                     if est["freeze_start"] is None:
                         est["freeze_start"] = agora
                     elif agora - est["freeze_start"] > tempo_limite_travado:
-                        print(
-                            f"[Monitor sim] Câmera {v.camera_id} com imagem congelada. Reconectando."
-                        )
-                        v.reconnect_with(force=True)
+                        _reconnect_or_disable(v, "sim")
                         est["freeze_start"] = None
                         est["dark_start"] = None
                         est["last_frame_time"] = agora
