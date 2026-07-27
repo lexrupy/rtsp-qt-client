@@ -12,6 +12,7 @@ from qtcompat import (
     QMessageBox,
     QMenu,
     QAction,
+    QTimer,
     QMessageBox_No,
     QMessageBox_Yes,
     QDialog_Accepted,
@@ -53,6 +54,9 @@ class MosaicoRTSP(QWidget):
         self.original_positions = {}
         self.current_fullscreen = None
         self.selected_viewer = None
+        self._save_debounce = QTimer()
+        self._save_debounce.setSingleShot(True)
+        self._save_debounce.timeout.connect(self.save_config)
         self.reload_cameras()
         self.monitor_timer, self.conectar_viewer = iniciar_monitoramento(self.viewers)
 
@@ -241,7 +245,7 @@ class MosaicoRTSP(QWidget):
             self.viewers[idx_v1],
         )
 
-        self.save_config()
+        self._schedule_save()
 
     def reorganize_grid(self):
         count = len(self.viewers)
@@ -425,6 +429,9 @@ class MosaicoRTSP(QWidget):
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, CONFIG_FILE)
+
+    def _schedule_save(self):
+        self._save_debounce.start(1000)
 
     def contextMenuEvent(self, event):
         widget_clicado = self.childAt(event.pos())
