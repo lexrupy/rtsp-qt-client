@@ -51,8 +51,6 @@ def iniciar_monitoramento(
         agora = time.time()
         est = estado.setdefault(viewer, {})
         est["last_frame_time"] = agora
-        est["retry_count"] = 0
-
         if getattr(viewer, "disabled", False):
             return
 
@@ -135,6 +133,7 @@ def iniciar_monitoramento(
                 f"[Monitor {motivo}] Câmera {v.camera_id} (tentativa {est['retry_count']}/{MAX_RETRIES}). Reconectando."
             )
             v.reconnect_with(force=True)
+            est["prev_img"] = None
 
     def verificar():
         agora = time.time()
@@ -192,6 +191,10 @@ def iniciar_monitoramento(
                         est["last_frame_time"] = agora
                 else:
                     est["freeze_start"] = None
+
+            # Só zera retry_count se TUDO estiver normal
+            if est.get("dark_start") is None and est.get("freeze_start") is None:
+                est["retry_count"] = 0
 
             est["prev_img"] = est["last_frame_img"]
 

@@ -57,6 +57,10 @@ class MosaicoRTSP(QWidget):
         self._save_debounce = QTimer()
         self._save_debounce.setSingleShot(True)
         self._save_debounce.timeout.connect(self.save_config)
+        self.hide_disabled = False
+        self._reload_debounce = QTimer()
+        self._reload_debounce.setSingleShot(True)
+        self._reload_debounce.timeout.connect(self.reload_cameras)
         self.reload_cameras()
         self.monitor_timer, self.conectar_viewer = iniciar_monitoramento(self.viewers)
 
@@ -440,6 +444,12 @@ class MosaicoRTSP(QWidget):
         remove_action = QAction("Remover câmera", self)
         copy_action = QAction("Copiar câmera", self)
         edit_action = QAction("Editar câmera", self)
+        ocultar_action = QAction("Ocultar desativadas", self)
+        ocultar_action.setCheckable(True)
+        ocultar_action.setChecked(self.hide_disabled)
+        ocultar_action.triggered.connect(self.toggle_hide_disabled)
+        gerenciar_action = QAction("Gerenciar câmeras...", self)
+        gerenciar_action.triggered.connect(self.manage_cameras_dialog)
         reconnect_action = QAction("Reconectar vídeos...", self)
         about_action = QAction("Sobre...", self)
         exit_action = QAction("Sair", self)
@@ -476,6 +486,10 @@ class MosaicoRTSP(QWidget):
         menu.addAction(copy_action)
         menu.addAction(edit_action)
         menu.addAction(remove_action)
+        menu.addSeparator()
+        menu.addAction(ocultar_action)
+        menu.addAction(gerenciar_action)
+        menu.addSeparator()
         menu.addAction(reconnect_action)
         menu.addAction(about_action)
         menu.addAction(exit_action)
@@ -486,6 +500,79 @@ class MosaicoRTSP(QWidget):
         if cam_data:
             cam_data["disabled"] = state
             self.save_config()
+        if state and self.hide_disabled:
+            self._reload_debounce.start(0)
+
+    def toggle_hide_disabled(self):
+        self.hide_disabled = not self.hide_disabled
+        self.reload_cameras()
+
+    def manage_cameras_dialog(self):
+        # IDs atualmente visiveis
+        visiveis = {c["id"] for c in self.cameras
+                    if not (self.hide_disabled and c.get("disabled", False))}
+        # Cameras desativadas que estao ocultas pelo hide_disabled
+        ocultas = []
+        for cam in self.cameras:
+            cid = cam["id"]
+            if cid not in visiveis:
+                ocultas.append((cam["id"], cam["url_low"], cam.get("disabled", False)))
+        # Cameras que existem no ini mas nao estao mais em self.cameras
+        ativos = {c["id"] for c in self.cameras}
+        for section in self.config.sections():
+            if section.startswith("Camera"):
+                try:
+                    cam_id = int(section[6:])
+                except ValueError:
+                    continue
+                if cam_id in ativos:
+                    continue
+                url_low = self.config.get(section, "url_low", fallback="")
+                if url_low:
+                    ocultas.append((cam_id, url_low, False))
+
+        if not ocultas:
+            QMessageBox.information(self, "Gerenciar", "Nenhuma câmera oculta ou inativa.")
+            return
+
+        items = "\n".join(
+            f"  [{cid}] {'desativada' if dis else url}"
+            for cid, url, dis in ocultas
+        )
+        reply = QMessageBox.question(
+            self,
+            "Câmeras ocultas",
+            f"Câmeras ocultas ou inativas:\n{items}\n\nReativar todas?",
+            QMessageBox_Yes | QMessageBox_No,
+        )
+        if reply == QMessageBox_Yes:
+            for entry in ocultas:
+                cam_id = entry[0]
+                # Se ja esta em self.cameras, reativa
+                cam = next((c for c in self.cameras if c["id"] == cam_id), None)
+                if cam:
+                    cam["disabled"] = False
+                    continue
+                # Se veio do ini, recria
+                section = f"Camera{cam_id}"
+                url_low = self.config.get(section, "url_low", fallback="")
+                url_high = self.config.get(section, "url_high", fallback="")
+                stream_type = self.config.get(section, "stream_type", fallback="GStreamer")
+                detect_person = self.config.getboolean(section, "detect_person", fallback=False)
+                alarm_on_detect = self.config.getboolean(section, "alarm_on_detect", fallback=False)
+                alarm_type = self.config.get(section, "alarm_type", fallback="doorbell")
+                self.cameras.append({
+                    "id": cam_id,
+                    "url_low": url_low,
+                    "url_high": url_high,
+                    "stream_type": stream_type,
+                    "detect_person": detect_person,
+                    "alarm_on_detect": alarm_on_detect,
+                    "alarm_type": alarm_type,
+                    "disabled": False,
+                })
+            self.save_config()
+            self.reload_cameras()
 
     def reconnect_all_cameras(self):
         for viewer in self.viewers:
@@ -519,14 +606,13 @@ class MosaicoRTSP(QWidget):
             self.show_no_camera_widget()
             return
 
-        count = len(self.cameras)
+        visiveis = [c for c in self.cameras if not (self.hide_disabled and c.get("disabled", False))]
+
+        count = len(visiveis)
         self.cols = int(math.ceil(math.sqrt(count)))
         self.rows = int(math.ceil(count / self.cols))
 
-        # Lista de IDs novos para remoção posterior
-        used_ids = set()
-
-        for index, cam in enumerate(self.cameras):
+        for index, cam in enumerate(visiveis):
             cam_id = cam["id"]
             cam_url = cam["url_low"]
             cam_url_high = cam["url_high"]
@@ -569,8 +655,6 @@ class MosaicoRTSP(QWidget):
             self.layout.addWidget(viewer, row, col)
             self.viewers.append(viewer)
             self.original_positions[viewer] = (row, col)
-            used_ids.add(cam_id)
-
         # Remove viewers que não estão mais em uso
         for cam_id, viewer in existing_viewers.items():
             viewer.close()
