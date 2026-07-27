@@ -153,6 +153,7 @@ class CameraViewer(QLabel):
                 "background-color: #333; color: white; font-size: 20px; font-weight: bold;"
             )
         else:
+            self.setScaledContents(True)
             self.setText("Conectando...")
             self.setStyleSheet(
                 "background-color: black; color: white; font-size: 16px;"
