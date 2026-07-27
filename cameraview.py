@@ -184,7 +184,7 @@ class CameraViewer(QLabel):
             e.acceptProposedAction()
 
     def dropEvent(self, e):
-        if self.disabled or not e.mimeData().hasText():
+        if not e.mimeData().hasText():
             return
         cam_id = int(e.mimeData().text())
         parent = self.parent()
