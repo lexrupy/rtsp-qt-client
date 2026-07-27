@@ -54,7 +54,7 @@ class MosaicoRTSP(QWidget):
         self.current_fullscreen = None
         self.selected_viewer = None
         self.reload_cameras()
-        self.monitor_timer = iniciar_monitoramento(self.viewers)
+        self.monitor_timer, self.conectar_viewer = iniciar_monitoramento(self.viewers)
 
     def show_about_dialog(self):
         dlg = AboutDialog(self)
@@ -519,6 +519,8 @@ class MosaicoRTSP(QWidget):
                     alarm_on_detect,
                     alarm_type
                 )
+                if hasattr(self, 'conectar_viewer'):
+                    self.conectar_viewer(viewer)
 
             row = index // self.cols
             col = index % self.cols

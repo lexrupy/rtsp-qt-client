@@ -14,7 +14,7 @@ from qtcompat import (
     Qt_Compat_GetMousePoint,
 )
 
-from camera import CameraThread
+from camera import CameraThread, READ_TIMEOUT_MSEC
 
 
 class CameraViewer(QLabel):
@@ -99,7 +99,10 @@ class CameraViewer(QLabel):
     def close(self):
         if self.thread:
             self.thread.stop()
-            self.thread.wait()
+            if not self.thread.wait(READ_TIMEOUT_MSEC + 2000):
+                print(f"[Camera {self.camera_id}] Thread travada, forçando termino...")
+                self.thread.terminate()
+                self.thread.wait(3000)
             self.thread = None
         super().close()
 

@@ -8,6 +8,9 @@ from qtcompat import (
 )
 
 
+READ_TIMEOUT_MSEC = 3000
+
+
 class CameraThread(QThread):
     frame_ready = pyqtSignal(QImage)
     connection_failed = pyqtSignal()
@@ -21,10 +24,9 @@ class CameraThread(QThread):
         self.cap = None
 
     def run(self):
-
         self.cap = self.configure_cap()
 
-        if not self.cap.isOpened():
+        if self.cap is None or not self.cap.isOpened():
             self.connection_failed.emit()
             self.stopped.emit()
             return
@@ -33,8 +35,9 @@ class CameraThread(QThread):
             if self.cap is None or not self.cap.isOpened():
                 break
             ret, frame = self.cap.read()
-            if not ret:
-                self.connection_failed.emit()
+            if not ret or not self.running:
+                if self.running:
+                    self.connection_failed.emit()
                 break
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb.shape
@@ -42,31 +45,43 @@ class CameraThread(QThread):
             image = QImage(rgb.data, w, h, bytesPerLine, QImage_Format_RGB888).copy()
             self.frame_ready.emit(image)
 
-        if self.cap is not None and hasattr(self.cap, "release"):
-            try:
-                self.cap.release()
-            except Exception as e:
-                    print(f"[Camera] Erro ao liberar cap: {e}")
-            finally:
-                 self.cap = None
+        self._release_cap()
         self.stopped.emit()
 
     def configure_cap(self):
-        if self.stream_type == "GStreamer":
-            gst = (
-                f"rtspsrc location={self.url} latency=0 ! "
-                "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
-            )
-            return cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
-        if self.stream_type == "OpenCV":
-            return cv2.VideoCapture(self.url)
-        if self.stream_type == "Ffmpeg":
-            return cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
-        if self.stream_type == "DirectShow":
-            return cv2.VideoCapture(self.url, cv2.CAP_DSHOW)
-        if self.stream_type == "MSMF":
-            return cv2.VideoCapture(self.url, cv2.CAP_MSMF)
-        return cv2.VideoCapture(self.url)
+        try:
+            if self.stream_type == "GStreamer":
+                gst = (
+                    f"rtspsrc location={self.url} latency=0 ! "
+                    "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
+                )
+                cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
+            elif self.stream_type == "OpenCV":
+                cap = cv2.VideoCapture(self.url)
+            elif self.stream_type == "Ffmpeg":
+                cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
+            elif self.stream_type == "DirectShow":
+                cap = cv2.VideoCapture(self.url, cv2.CAP_DSHOW)
+            elif self.stream_type == "MSMF":
+                cap = cv2.VideoCapture(self.url, cv2.CAP_MSMF)
+            else:
+                cap = cv2.VideoCapture(self.url)
+
+            self._apply_cap_timeout(cap)
+            return cap
+        except Exception as e:
+            print(f"[Camera] Erro ao configurar cap: {e}")
+            return None
+
+    def _apply_cap_timeout(self, cap):
+        try:
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, READ_TIMEOUT_MSEC)
+        except Exception:
+            pass
+        try:
+            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, READ_TIMEOUT_MSEC)
+        except Exception:
+            pass
 
     def restart_with(self, url, force=False):
         if not force and url == self.url:
@@ -74,7 +89,10 @@ class CameraThread(QThread):
 
         self.stop()
         if self.isRunning():
-            self.wait()
+            if not self.wait(READ_TIMEOUT_MSEC + 2000):
+                print(f"[Camera] Thread travada, forçando termino...")
+                self.terminate()
+                self.wait(3000)
 
         self.url = url
         self.running = True
@@ -82,10 +100,14 @@ class CameraThread(QThread):
 
     def stop(self):
         self.running = False
-        try:
-            if hasattr(self, "cap") and self.cap.isOpened():
-                self.cap.release()
-                self.cap = None
+        self._release_cap()
 
-        except Exception:
-            pass
+    def _release_cap(self):
+        if self.cap is not None:
+            try:
+                if self.cap.isOpened():
+                    self.cap.release()
+            except Exception:
+                pass
+            finally:
+                self.cap = None

@@ -115,11 +115,14 @@ def iniciar_monitoramento(
 
         estado[viewer]["last_frame_img"] = small
 
-    # Conectar sinais frame_ready para cada viewer
-    for v in viewers:
+    def conectar_viewer(v):
         v._frame_handler = lambda img, viewer=v: on_frame(viewer, img)
         v.thread.frame_ready.connect(v._frame_handler)
         inicializar_estado(v)
+
+    # Conectar sinais frame_ready para cada viewer
+    for v in viewers:
+        conectar_viewer(v)
 
     def verificar():
         agora = time.time()
@@ -171,7 +174,7 @@ def iniciar_monitoramento(
 
                 similar = 1 - diff
 
-                if diff > similaridade_minima:
+                if similar > similaridade_minima:
                     if est["freeze_start"] is None:
                         est["freeze_start"] = agora
                     elif agora - est["freeze_start"] > tempo_limite_travado:
@@ -183,12 +186,11 @@ def iniciar_monitoramento(
                         est["dark_start"] = None
                         est["last_frame_time"] = agora
                 else:
-                    if similar < similaridade_minima / 2:
-                        est["freeze_start"] = None
+                    est["freeze_start"] = None
 
             est["prev_img"] = est["last_frame_img"]
 
     timer = QTimer()
     timer.timeout.connect(verificar)
     timer.start(intervalo_ms)
-    return timer
+    return timer, conectar_viewer
