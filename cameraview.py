@@ -180,7 +180,7 @@ class CameraViewer(QLabel):
             self.parent().toggle_fullscreen(self)
 
     def dragEnterEvent(self, e):
-        if not self.disabled and e.mimeData().hasText():
+        if e.mimeData().hasText():
             e.acceptProposedAction()
 
     def dropEvent(self, e):
