@@ -314,6 +314,7 @@ class MosaicoRTSP(QWidget):
         self.save_config()
 
     def closeEvent(self, event):
+        self.save_config()
         for viewer in self.viewers:
             if viewer.thread:
                 viewer._disconnect_thread(viewer.thread)
@@ -511,6 +512,7 @@ class MosaicoRTSP(QWidget):
 
     def toggle_hide_disabled(self):
         self.hide_disabled = not self.hide_disabled
+        self.save_config()
         self.reload_cameras()
 
     def manage_cameras_dialog(self):
