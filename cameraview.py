@@ -100,12 +100,7 @@ class CameraViewer(QLabel):
         old_thread = self.thread
         self._disconnect_thread(old_thread)
         old_thread.stop()
-
-        if old_thread.wait(THREAD_STOP_TIMEOUT):
-            old_thread.deleteLater()
-        else:
-            print(f"[Camera {self.camera_id}] Thread travada, substituindo...")
-            old_thread.deleteLater()
+        old_thread.deleteLater()
 
         self.thread = CameraThread(self.current_url, self.stream_type)
         self.thread.frame_ready.connect(self.update_frame)

@@ -57,7 +57,9 @@ class MosaicoRTSP(QWidget):
         self._save_debounce = QTimer()
         self._save_debounce.setSingleShot(True)
         self._save_debounce.timeout.connect(self.save_config)
-        self.hide_disabled = False
+        self.hide_disabled = self.config.getboolean(
+            "Cameras", "hide_disabled", fallback=False
+        )
         self._reload_debounce = QTimer()
         self._reload_debounce.setSingleShot(True)
         self._reload_debounce.timeout.connect(self.reload_cameras)
@@ -424,6 +426,10 @@ class MosaicoRTSP(QWidget):
             )
             self.config.set(section, "alarm_type", str(cam.get("alarm_type", "doorbell")))
             self.config.set(section, "disabled", str(cam.get("disabled", False)))
+
+        self.config.set(
+            "Cameras", "hide_disabled", str(self.hide_disabled)
+        )
 
         config_dir = os.path.dirname(CONFIG_FILE)
         os.makedirs(config_dir, exist_ok=True)
