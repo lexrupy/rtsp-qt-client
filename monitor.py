@@ -156,6 +156,11 @@ def iniciar_monitoramento(
             if est["last_frame_img"] is None:
                 continue
 
+            # Pula analise se o thumbnail nao mudou desde a ultima checagem
+            if est.get("_checked_img") is est["last_frame_img"]:
+                continue
+            est["_checked_img"] = est["last_frame_img"]
+
             brilho = np.mean(est["last_frame_img"])
             if brilho < brilho_minimo:
                 if est["dark_start"] is None:
@@ -171,14 +176,7 @@ def iniciar_monitoramento(
 
             last_img = est.get("prev_img")
             if last_img is not None:
-                diff = (
-                    np.mean(
-                        np.abs(
-                            est["last_frame_img"].astype(float) - last_img.astype(float)
-                        )
-                    )
-                    / 255
-                )
+                diff = np.mean(cv2.absdiff(est["last_frame_img"], last_img)) / 255
                 similar = 1 - diff
 
                 if similar > similaridade_minima:
