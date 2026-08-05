@@ -85,6 +85,13 @@ class CameraThread(QThread):
 
     def stop(self):
         self.running = False
+        # Se read() estiver preso, liberar a cap desbloqueia a thread
+        cap = self.cap
+        if cap is not None:
+            try:
+                cap.release()
+            except Exception:
+                pass
 
     def _release_cap(self):
         if self.cap is not None:

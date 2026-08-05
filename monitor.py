@@ -198,7 +198,10 @@ def iniciar_monitoramento(
 
             est["prev_img"] = est["last_frame_img"]
 
+    def descartar_viewer(v):
+        estado.pop(v, None)
+
     timer = QTimer()
     timer.timeout.connect(verificar)
     timer.start(intervalo_ms)
-    return timer, conectar_viewer
+    return timer, conectar_viewer, descartar_viewer

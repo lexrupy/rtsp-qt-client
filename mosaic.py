@@ -65,7 +65,9 @@ class MosaicoRTSP(QWidget):
         self._reload_debounce.setSingleShot(True)
         self._reload_debounce.timeout.connect(self.reload_cameras)
         self.reload_cameras()
-        self.monitor_timer, self.conectar_viewer = iniciar_monitoramento(self.viewers)
+        self.monitor_timer, self.conectar_viewer, self.descartar_viewer = iniciar_monitoramento(
+            self.viewers
+        )
 
     def show_about_dialog(self):
         dlg = AboutDialog(self)
@@ -303,6 +305,8 @@ class MosaicoRTSP(QWidget):
             return
 
         # Remove do layout e da UI
+        if hasattr(self, 'descartar_viewer'):
+            self.descartar_viewer(viewer)
         self.layout.removeWidget(viewer)
         viewer.close()
         viewer.deleteLater()
@@ -674,6 +678,8 @@ class MosaicoRTSP(QWidget):
             self.original_positions[viewer] = (row, col)
         # Remove viewers que não estão mais em uso
         for cam_id, viewer in existing_viewers.items():
+            if hasattr(self, 'descartar_viewer'):
+                self.descartar_viewer(viewer)
             viewer.close()
             self.layout.removeWidget(viewer)
             viewer.deleteLater()

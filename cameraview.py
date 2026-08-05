@@ -172,6 +172,9 @@ class CameraViewer(QLabel):
             parent.on_camera_disabled(self.camera_id, state)
 
     def close(self):
+        pending = getattr(self, "_pending_threads", [])
+        for th in pending:
+            th.stop()
         if self.thread:
             self._disconnect_thread(self.thread)
             self.thread.stop()
