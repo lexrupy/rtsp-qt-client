@@ -115,6 +115,10 @@ def iniciar_monitoramento(
         inicializar_estado(v)
         v._frame_handler = lambda img, viewer=v: on_frame(viewer, img)
         if not getattr(v, "disabled", False) and v.thread is not None:
+            try:
+                v.thread.frame_ready.disconnect(v.update_frame)
+            except TypeError:
+                pass
             v.thread.frame_ready.connect(v._frame_handler)
 
     for v in viewers:

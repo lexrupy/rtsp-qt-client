@@ -61,7 +61,6 @@ class CameraViewer(QLabel):
         self.connecting = True
         self.setPixmap(QPixmap())
         self.thread = CameraThread(self.current_url, self.stream_type)
-        self.thread.frame_ready.connect(self.update_frame)
         self.thread.connection_failed.connect(self.show_connection_error)
         self._reconnect_monitor()
         self.thread.start()
@@ -69,13 +68,16 @@ class CameraViewer(QLabel):
     def _reconnect_monitor(self):
         if hasattr(self, '_frame_handler') and self._frame_handler is not None:
             self.thread.frame_ready.connect(self._frame_handler)
+        else:
+            self.thread.frame_ready.connect(self.update_frame)
 
     def _disconnect_thread(self, thread):
         try:
-            thread.frame_ready.disconnect(self.update_frame)
-            thread.connection_failed.disconnect(self.show_connection_error)
-            if hasattr(self, '_frame_handler'):
+            if hasattr(self, '_frame_handler') and self._frame_handler is not None:
                 thread.frame_ready.disconnect(self._frame_handler)
+            else:
+                thread.frame_ready.disconnect(self.update_frame)
+            thread.connection_failed.disconnect(self.show_connection_error)
         except TypeError:
             pass
 
@@ -115,7 +117,6 @@ class CameraViewer(QLabel):
         old_thread.finished.connect(lambda: _cleanup(old_thread))
 
         self.thread = CameraThread(self.current_url, self.stream_type)
-        self.thread.frame_ready.connect(self.update_frame)
         self.thread.connection_failed.connect(self.show_connection_error)
         self._reconnect_monitor()
         self.thread.start()
