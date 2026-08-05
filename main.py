@@ -4,6 +4,8 @@ import os
 import sys
 from mosaic import MosaicoRTSP
 
+from crashlog import setup_crash_logging
+
 from qtcompat import (
     QPixmap,
     QIcon,
@@ -28,6 +30,7 @@ def prevent_screensaver(w):
 
 
 if __name__ == "__main__":
+    setup_crash_logging()
     app = QApplication(sys.argv)
 
     app.setWindowIcon(
