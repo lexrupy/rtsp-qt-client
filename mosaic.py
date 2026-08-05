@@ -623,6 +623,12 @@ class MosaicoRTSP(QWidget):
         visiveis = [c for c in self.cameras if not (self.hide_disabled and c.get("disabled", False))]
 
         count = len(visiveis)
+        if count == 0:
+            self.cols = 1
+            self.rows = 1
+            self.show_no_camera_widget()
+            return
+
         self.cols = int(math.ceil(math.sqrt(count)))
         self.rows = int(math.ceil(count / self.cols))
 
