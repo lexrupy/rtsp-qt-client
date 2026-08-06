@@ -16,8 +16,9 @@ def iniciar_monitoramento(
     intervalo_ms=1000,
     tempo_limite_travado=10,
     tempo_limite_escuro=10,
-    tempo_limite_sem_imagem=15,
+    tempo_limite_sem_imagem=20,
     brilho_minimo=20,
+    brilho_recuperar=50,
     similaridade_minima=0.999999,
 ):
 
@@ -141,9 +142,10 @@ def iniciar_monitoramento(
             est = estado[v]
 
             if est.get("em_sugestao"):
-                # Se a camera se recuperou sozinha, limpa a sugestao
+                # So recupera (limpa sugestao) se a imagem ja estiver
+                # claramente normal de novo (histerese evita piscar)
                 if (est["last_frame_img"] is not None
-                        and np.mean(est["last_frame_img"]) >= brilho_minimo
+                        and np.mean(est["last_frame_img"]) >= brilho_recuperar
                         and (agora - est["last_frame_time"]) <= tempo_limite_sem_imagem):
                     retomar_viewer(v)
                 continue
