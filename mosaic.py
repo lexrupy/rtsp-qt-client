@@ -502,15 +502,22 @@ class MosaicoRTSP(QWidget):
         menu.addAction(ocultar_action)
         menu.addAction(gerenciar_action)
 
-        desativadas = [c for c in self.cameras if c.get("disabled", False)]
-        if desativadas:
-            submenu = menu.addMenu("Câmeras desativadas")
-            for cam in desativadas:
-                act = QAction(f"Câmera {cam['id']} - {cam['url_low']}", self)
-                act.triggered.connect(
-                    lambda checked=False, cid=cam["id"]: self.reativar_camera(cid)
+        submenu_cameras = menu.addMenu("Câmeras")
+        for cam in self.cameras:
+            cid = cam["id"]
+            disabled = cam.get("disabled", False)
+            nome = f"Câmera {cid}" + (" (desativada)" if disabled else "")
+            item = submenu_cameras.addMenu(nome)
+            if disabled:
+                a = item.addAction("Reativar")
+                a.triggered.connect(
+                    lambda checked=False, cid=cid: self.reativar_camera(cid)
                 )
-                submenu.addAction(act)
+            else:
+                a = item.addAction("Desativar")
+                a.triggered.connect(
+                    lambda checked=False, cid=cid: self.desativar_camera(cid)
+                )
 
         menu.addSeparator()
         menu.addAction(reconnect_action)
@@ -530,6 +537,18 @@ class MosaicoRTSP(QWidget):
         viewer = next((v for v in self.viewers if v.camera_id == cam_id), None)
         if viewer and hasattr(self, 'retomar_viewer'):
             self.retomar_viewer(viewer)
+
+    def desativar_camera(self, cam_id):
+        cam = next((c for c in self.cameras if c["id"] == cam_id), None)
+        if not cam:
+            return
+        viewer = next((v for v in self.viewers if v.camera_id == cam_id), None)
+        if viewer:
+            viewer.set_disabled(True)
+        else:
+            cam["disabled"] = True
+            self.save_config()
+            self.reload_cameras()
 
     def reativar_camera(self, cam_id):
         cam = next((c for c in self.cameras if c["id"] == cam_id), None)
