@@ -31,14 +31,24 @@ class CameraThread(QThread):
             self.stopped.emit()
             return
 
+        read_falhas = 0
+        max_falhas = 4
         while self.running:
             if self.cap is None or not self.cap.isOpened():
                 break
             ret, frame = self.cap.read()
-            if not ret or not self.running:
-                if self.running:
-                    self.connection_failed.emit()
+            if self.cap is None or not self.running:
                 break
+            if not ret:
+                # Blip transitorio de rede: nao desiste na primeira falha.
+                # read()/timeout ja bloqueou; tenta mais umas vezes antes de
+                # declarar perda de conexao.
+                read_falhas += 1
+                if read_falhas >= max_falhas:
+                    self.connection_failed.emit()
+                    break
+                continue
+            read_falhas = 0
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb.shape
             bytesPerLine = ch * w
