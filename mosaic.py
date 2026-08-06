@@ -636,7 +636,11 @@ class MosaicoRTSP(QWidget):
 
     def reconnect_all_cameras(self):
         for viewer in self.viewers:
-            viewer.reconnect_with(force=True)
+            if hasattr(viewer, '_on_reconectar'):
+                viewer._on_reconectar()
+            else:
+                viewer.reconnect_with(force=True)
+            QApplication.processEvents()
 
     def remove_camera_dialog(self):
         if self.selected_viewer is None:
