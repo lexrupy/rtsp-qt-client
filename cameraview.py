@@ -5,6 +5,9 @@ from qtcompat import (
     QApplication,
     QDrag,
     QMimeData,
+    QWidget,
+    QPushButton,
+    QVBoxLayout,
     QSizePolicy_Expanding,
     Qt_AlignmentFlag_AlignCenter,
     Qt_AspectRatioMode_KeepAspectRatio,
@@ -55,7 +58,60 @@ class CameraViewer(QLabel):
         self.current_url = self.url_low
         self.connecting = False
         self.disabled = False
+        self._overlay = None
         self.init_capture()
+
+    def _create_overlay(self):
+        ov = QWidget(self)
+        ov.setStyleSheet(
+            "background-color: rgba(30,30,30,200); color: white; font-size: 14px;"
+        )
+        lay = QVBoxLayout(ov)
+        lay.addStretch(1)
+        lbl = QLabel("")
+        lbl.setAlignment(Qt_AlignmentFlag_AlignCenter)
+        lay.addWidget(lbl)
+        btn_desativar = QPushButton("Desativar")
+        btn_reconectar = QPushButton("Reconectar")
+        btn_desativar.setStyleSheet(
+            "background-color: #c0392b; color: white; padding: 6px; border-radius: 4px;"
+        )
+        btn_reconectar.setStyleSheet(
+            "background-color: #2980b9; color: white; padding: 6px; border-radius: 4px;"
+        )
+        btn_desativar.clicked.connect(lambda: self.set_disabled(True))
+        btn_reconectar.clicked.connect(self._on_reconectar)
+        lay.addWidget(btn_desativar, alignment=Qt_AlignmentFlag_AlignCenter)
+        lay.addWidget(btn_reconectar, alignment=Qt_AlignmentFlag_AlignCenter)
+        lay.addStretch(1)
+        ov.hide()
+        return ov
+
+    def set_problem(self, motivo):
+        if self.disabled:
+            return
+        if self._overlay is None:
+            self._overlay = self._create_overlay()
+        self._overlay.findChild(QLabel).setText(f"Câmera {motivo}")
+        self._overlay.setGeometry(0, 0, self.width(), self.height())
+        self._overlay.show()
+        self._overlay.raise_()
+
+    def clear_problem(self):
+        if self._overlay is not None:
+            self._overlay.hide()
+
+    def _on_reconectar(self):
+        self.clear_problem()
+        self.reconnect_with(force=True)
+        parent = self.parent()
+        if hasattr(parent, 'on_camera_retomar'):
+            parent.on_camera_retomar(self.camera_id)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._overlay is not None:
+            self._overlay.setGeometry(0, 0, self.width(), self.height())
 
     def init_capture(self):
         self.connecting = True
@@ -146,6 +202,7 @@ class CameraViewer(QLabel):
     def set_disabled(self, state):
         self.disabled = state
         if state:
+            self.clear_problem()
             if self.thread:
                 self._disconnect_thread(self.thread)
                 self.thread.stop()
@@ -161,6 +218,7 @@ class CameraViewer(QLabel):
                 "background-color: #333; color: white; font-size: 20px; font-weight: bold;"
             )
         else:
+            self.clear_problem()
             self.setScaledContents(True)
             self.setText("Conectando...")
             self.setStyleSheet(
@@ -171,6 +229,8 @@ class CameraViewer(QLabel):
         parent = self.parent()
         if hasattr(parent, 'on_camera_disabled'):
             parent.on_camera_disabled(self.camera_id, state)
+        if not state and hasattr(parent, 'on_camera_retomar'):
+            parent.on_camera_retomar(self.camera_id)
 
     def close(self):
         pending = getattr(self, "_pending_threads", [])

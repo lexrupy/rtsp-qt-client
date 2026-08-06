@@ -11,14 +11,11 @@ from qtcompat import QTimer, QImage, QImage_Format_RGB888, Qt_Compat_Qimage_Byte
 ALARM_FILE = os.path.join(os.path.dirname(__file__), "alarm.wav")
 DOORBEL_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
 
-MAX_RETRIES = 3
-
-
 def iniciar_monitoramento(
     viewers,
-    intervalo_ms=2000,
-    tempo_limite_travado=10,
-    tempo_limite_escuro=10,
+    intervalo_ms=1000,
+    tempo_limite_travado=5,
+    tempo_limite_escuro=5,
     brilho_minimo=20,
     similaridade_minima=0.999999,
 ):
@@ -31,7 +28,6 @@ def iniciar_monitoramento(
             "last_frame_img": None,
             "dark_start": None,
             "freeze_start": None,
-            "retry_count": 0,
         }
 
     def _thumbnail_from_qimage(qimage):
@@ -124,20 +120,14 @@ def iniciar_monitoramento(
     for v in viewers:
         conectar_viewer(v)
 
-    def _reconnect_or_disable(v, motivo):
+    def _sugerir_problema(v, motivo):
         est = estado[v]
-        est["retry_count"] = est.get("retry_count", 0) + 1
-        if est["retry_count"] >= MAX_RETRIES:
-            print(
-                f"[Monitor] Câmera {v.camera_id} desativada após {MAX_RETRIES} tentativas ({motivo})"
-            )
-            v.set_disabled(True)
-        else:
-            print(
-                f"[Monitor {motivo}] Câmera {v.camera_id} (tentativa {est['retry_count']}/{MAX_RETRIES}). Reconectando."
-            )
-            v.reconnect_with(force=True)
-            est["prev_img"] = None
+        est["em_sugestao"] = True
+        est["dark_start"] = None
+        est["freeze_start"] = None
+        est["last_frame_time"] = time.time()
+        if hasattr(v, "set_problem"):
+            v.set_problem(motivo)
 
     def verificar():
         agora = time.time()
@@ -149,12 +139,12 @@ def iniciar_monitoramento(
                 inicializar_estado(v)
             est = estado[v]
 
+            if est.get("em_sugestao"):
+                continue
+
             tempo_sem_frame = agora - est["last_frame_time"]
             if tempo_sem_frame > tempo_limite_travado:
-                _reconnect_or_disable(v, "nofrm")
-                est["last_frame_time"] = agora
-                est["dark_start"] = None
-                est["freeze_start"] = None
+                _sugerir_problema(v, "sem imagem")
                 continue
 
             if est["last_frame_img"] is None:
@@ -170,10 +160,7 @@ def iniciar_monitoramento(
                 if est["dark_start"] is None:
                     est["dark_start"] = agora
                 elif agora - est["dark_start"] > tempo_limite_escuro:
-                    _reconnect_or_disable(v, "blk")
-                    est["dark_start"] = None
-                    est["freeze_start"] = None
-                    est["last_frame_time"] = agora
+                    _sugerir_problema(v, "escura")
                     continue
             else:
                 est["dark_start"] = None
@@ -187,23 +174,27 @@ def iniciar_monitoramento(
                     if est["freeze_start"] is None:
                         est["freeze_start"] = agora
                     elif agora - est["freeze_start"] > tempo_limite_travado:
-                        _reconnect_or_disable(v, "sim")
-                        est["freeze_start"] = None
-                        est["dark_start"] = None
-                        est["last_frame_time"] = agora
+                        _sugerir_problema(v, "travada")
+                        continue
                 else:
                     est["freeze_start"] = None
-
-            # Só zera retry_count se TUDO estiver normal
-            if est.get("dark_start") is None and est.get("freeze_start") is None:
-                est["retry_count"] = 0
 
             est["prev_img"] = est["last_frame_img"]
 
     def descartar_viewer(v):
         estado.pop(v, None)
 
+    def retomar_viewer(v):
+        est = estado.get(v)
+        if est:
+            est.pop("em_sugestao", None)
+            est["dark_start"] = None
+            est["freeze_start"] = None
+            est["last_frame_time"] = time.time()
+        if hasattr(v, "clear_problem"):
+            v.clear_problem()
+
     timer = QTimer()
     timer.timeout.connect(verificar)
     timer.start(intervalo_ms)
-    return timer, conectar_viewer, descartar_viewer
+    return timer, conectar_viewer, descartar_viewer, retomar_viewer

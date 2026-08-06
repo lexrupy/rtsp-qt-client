@@ -65,7 +65,7 @@ class MosaicoRTSP(QWidget):
         self._reload_debounce.setSingleShot(True)
         self._reload_debounce.timeout.connect(self.reload_cameras)
         self.reload_cameras()
-        self.monitor_timer, self.conectar_viewer, self.descartar_viewer = iniciar_monitoramento(
+        self.monitor_timer, self.conectar_viewer, self.descartar_viewer, self.retomar_viewer = iniciar_monitoramento(
             self.viewers
         )
 
@@ -514,6 +514,11 @@ class MosaicoRTSP(QWidget):
             self.save_config()
         if state and self.hide_disabled:
             self._reload_debounce.start(0)
+
+    def on_camera_retomar(self, cam_id):
+        viewer = next((v for v in self.viewers if v.camera_id == cam_id), None)
+        if viewer and hasattr(self, 'retomar_viewer'):
+            self.retomar_viewer(viewer)
 
     def toggle_hide_disabled(self):
         self.hide_disabled = not self.hide_disabled
