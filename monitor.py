@@ -18,8 +18,8 @@ def iniciar_monitoramento(
     tempo_limite_escuro=10,
     tempo_limite_sem_imagem=20,
     brilho_minimo=20,
-    brilho_recuperar=50,
     similaridade_minima=0.999999,
+    intervalo_reconexao=20,
 ):
 
     estado = {}
@@ -127,9 +127,13 @@ def iniciar_monitoramento(
         est["em_sugestao"] = True
         est["dark_start"] = None
         est["freeze_start"] = None
-        est["last_frame_time"] = time.time()
+        est["_flag_time"] = time.time()
         if hasattr(v, "set_problem"):
             v.set_problem(motivo)
+
+    def _auto_reconectar(v):
+        if hasattr(v, "_on_reconectar"):
+            v._on_reconectar()
 
     def verificar():
         agora = time.time()
@@ -142,12 +146,11 @@ def iniciar_monitoramento(
             est = estado[v]
 
             if est.get("em_sugestao"):
-                # So recupera (limpa sugestao) se a imagem ja estiver
-                # claramente normal de novo (histerese evita piscar)
-                if (est["last_frame_img"] is not None
-                        and np.mean(est["last_frame_img"]) >= brilho_recuperar
-                        and (agora - est["last_frame_time"]) <= tempo_limite_sem_imagem):
-                    retomar_viewer(v)
+                # Reconecta automaticamente (com intervalo) enquanto a
+                # camera estiver com problema; nao desativa nem pisca.
+                if (agora - est.get("_flag_time", agora)) >= intervalo_reconexao:
+                    est["_flag_time"] = agora
+                    _auto_reconectar(v)
                 continue
 
             tempo_sem_frame = agora - est["last_frame_time"]
