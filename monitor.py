@@ -14,8 +14,8 @@ DOORBEL_FILE = os.path.join(os.path.dirname(__file__), "doorbell.wav")
 def iniciar_monitoramento(
     viewers,
     intervalo_ms=1000,
-    tempo_limite_travado=5,
-    tempo_limite_escuro=5,
+    tempo_limite_travado=10,
+    tempo_limite_escuro=10,
     tempo_limite_sem_imagem=15,
     brilho_minimo=20,
     similaridade_minima=0.999999,
@@ -141,6 +141,11 @@ def iniciar_monitoramento(
             est = estado[v]
 
             if est.get("em_sugestao"):
+                # Se a camera se recuperou sozinha, limpa a sugestao
+                if (est["last_frame_img"] is not None
+                        and np.mean(est["last_frame_img"]) >= brilho_minimo
+                        and (agora - est["last_frame_time"]) <= tempo_limite_sem_imagem):
+                    retomar_viewer(v)
                 continue
 
             tempo_sem_frame = agora - est["last_frame_time"]
