@@ -501,6 +501,17 @@ class MosaicoRTSP(QWidget):
         menu.addSeparator()
         menu.addAction(ocultar_action)
         menu.addAction(gerenciar_action)
+
+        desativadas = [c for c in self.cameras if c.get("disabled", False)]
+        if desativadas:
+            submenu = menu.addMenu("Câmeras desativadas")
+            for cam in desativadas:
+                act = QAction(f"Câmera {cam['id']} - {cam['url_low']}", self)
+                act.triggered.connect(
+                    lambda checked=False, cid=cam["id"]: self.reativar_camera(cid)
+                )
+                submenu.addAction(act)
+
         menu.addSeparator()
         menu.addAction(reconnect_action)
         menu.addAction(about_action)
@@ -519,6 +530,18 @@ class MosaicoRTSP(QWidget):
         viewer = next((v for v in self.viewers if v.camera_id == cam_id), None)
         if viewer and hasattr(self, 'retomar_viewer'):
             self.retomar_viewer(viewer)
+
+    def reativar_camera(self, cam_id):
+        cam = next((c for c in self.cameras if c["id"] == cam_id), None)
+        if not cam:
+            return
+        viewer = next((v for v in self.viewers if v.camera_id == cam_id), None)
+        if viewer:
+            viewer.set_disabled(False)
+        else:
+            cam["disabled"] = False
+            self.save_config()
+            self.reload_cameras()
 
     def toggle_hide_disabled(self):
         self.hide_disabled = not self.hide_disabled

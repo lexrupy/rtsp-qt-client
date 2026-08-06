@@ -16,6 +16,7 @@ def iniciar_monitoramento(
     intervalo_ms=1000,
     tempo_limite_travado=5,
     tempo_limite_escuro=5,
+    tempo_limite_sem_imagem=15,
     brilho_minimo=20,
     similaridade_minima=0.999999,
 ):
@@ -143,7 +144,7 @@ def iniciar_monitoramento(
                 continue
 
             tempo_sem_frame = agora - est["last_frame_time"]
-            if tempo_sem_frame > tempo_limite_travado:
+            if tempo_sem_frame > tempo_limite_sem_imagem:
                 _sugerir_problema(v, "sem imagem")
                 continue
 
