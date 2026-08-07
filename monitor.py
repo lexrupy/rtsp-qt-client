@@ -62,57 +62,70 @@ def iniciar_monitoramento(
         est["_frame_ts"] = agora
 
         if viewer.detect_person:
-            ptr = qimage.bits()
-            ptr.setsize(Qt_Compat_Qimage_ByteCount(qimage))
-            height = qimage.height()
-            width = qimage.width()
-            arr = np.array(ptr).reshape(
-                height, width, 4 if qimage.hasAlphaChannel() else 3
-            )
+            # DNN (MobileNet SSD) e pesado: roda no maximo ~5fps por camera,
+            # independente do display. Entre uma deteccao e outra, mostra o
+            # frame atual sem analisar.
+            DETECT_INTERVAL = 0.2
+            if agora - est.get("_detect_ts", 0) >= DETECT_INTERVAL:
+                est["_detect_ts"] = agora
+                ptr = qimage.bits()
+                ptr.setsize(Qt_Compat_Qimage_ByteCount(qimage))
+                height = qimage.height()
+                width = qimage.width()
+                arr = np.array(ptr).reshape(
+                    height, width, 4 if qimage.hasAlphaChannel() else 3
+                )
 
-            if arr.shape[2] == 4:
-                arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
-            else:
-                arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+                if arr.shape[2] == 4:
+                    arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+                else:
+                    arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
 
-            if getattr(viewer, "detect_person", False):
-                arr, person_detected = detect_person(arr)
-            else:
-                person_detected = False
+                if getattr(viewer, "detect_person", False):
+                    arr, person_detected = detect_person(arr)
+                else:
+                    person_detected = False
 
-            if not hasattr(viewer, "pessoa_presente"):
-                viewer.pessoa_presente = False
-                viewer.ultimo_tempo_presenca = 0
-                viewer.alarme_tocado = False
-
-            if person_detected:
-                viewer.ultimo_tempo_presenca = agora
-                if not viewer.pessoa_presente:
-                    viewer.pessoa_presente = True
-                    if not viewer.alarme_tocado:
-                        viewer.alarme_tocado = True
-                        viewer.last_detection_time = agora
-                        if viewer.alarm_on_detect:
-                            if viewer.alarm_type == "doorbell":
-                                subprocess.Popen(["paplay", DOORBEL_FILE])
-                            else:
-                                subprocess.Popen(["paplay", ALARM_FILE])
-            else:
-                if viewer.pessoa_presente and (
-                    agora - viewer.ultimo_tempo_presenca > 3
-                ):
+                if not hasattr(viewer, "pessoa_presente"):
                     viewer.pessoa_presente = False
+                    viewer.ultimo_tempo_presenca = 0
                     viewer.alarme_tocado = False
 
-            gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
-            est["last_frame_img"] = cv2.resize(gray, (64, 36))
+                if person_detected:
+                    viewer.ultimo_tempo_presenca = agora
+                    if not viewer.pessoa_presente:
+                        viewer.pessoa_presente = True
+                        if not viewer.alarme_tocado:
+                            viewer.alarme_tocado = True
+                            viewer.last_detection_time = agora
+                            if viewer.alarm_on_detect:
+                                if viewer.alarm_type == "doorbell":
+                                    subprocess.Popen(["paplay", DOORBEL_FILE])
+                                else:
+                                    subprocess.Popen(["paplay", ALARM_FILE])
+                else:
+                    if viewer.pessoa_presente and (
+                        agora - viewer.ultimo_tempo_presenca > 3
+                    ):
+                        viewer.pessoa_presente = False
+                        viewer.alarme_tocado = False
 
-            rgb_display = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb_display.shape
-            qimg_display = QImage(
-                rgb_display.data, w, h, ch * w, QImage_Format_RGB888
-            ).copy()
-            viewer.update_frame(qimg_display)
+                gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+                est["last_frame_img"] = cv2.resize(gray, (64, 36))
+
+                rgb_display = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+                h, w, ch = rgb_display.shape
+                qimg_display = QImage(
+                    rgb_display.data, w, h, ch * w, QImage_Format_RGB888
+                ).copy()
+                viewer.update_frame(qimg_display)
+                return
+            # Entre deteccoes: mostra o frame atual sem rodar a DNN.
+            viewer.update_frame(qimage)
+            last_thumb = est.get("_thumb_time", 0)
+            if est["last_frame_img"] is None or (agora - last_thumb) >= 2:
+                est["last_frame_img"] = _thumbnail_from_qimage(qimage)
+                est["_thumb_time"] = agora
         else:
             viewer.update_frame(qimage)
 
