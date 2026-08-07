@@ -52,6 +52,15 @@ def iniciar_monitoramento(
         if getattr(viewer, "disabled", False):
             return
 
+        # Throttling: no maximo ~25fps de processamento por camera.
+        # Uma camera com glitch pode disparar frames em rajada e afogar a
+        # main thread (cvtColor + QPixmap.fromImage().scaled() por frame);
+        # frames intermediarios sao descartados.
+        THROTTLE_INTERVAL = 0.04
+        if agora - est.get("_frame_ts", 0) < THROTTLE_INTERVAL:
+            return
+        est["_frame_ts"] = agora
+
         if viewer.detect_person:
             ptr = qimage.bits()
             ptr.setsize(Qt_Compat_Qimage_ByteCount(qimage))
