@@ -171,6 +171,11 @@ class CameraViewer(QLabel):
                 pending.remove(th)
 
         old_thread.finished.connect(lambda: _cleanup(old_thread))
+        # Se a thread ja terminou (morreu por connection_failed antes do
+        # reconnect, por exemplo), o sinal finished nao vai mais disparar.
+        # Limpa agora para nao acumular threads presas em _pending_threads.
+        if old_thread.isFinished():
+            _cleanup(old_thread)
 
         self.thread = CameraThread(self.current_url, self.stream_type)
         self.thread.connection_failed.connect(self.show_connection_error)
