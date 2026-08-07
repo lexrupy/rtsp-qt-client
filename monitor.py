@@ -66,7 +66,10 @@ def iniciar_monitoramento(
             else:
                 arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
 
-            arr, person_detected = detect_person(arr)
+            if getattr(viewer, "detect_person", False):
+                arr, person_detected = detect_person(arr)
+            else:
+                person_detected = False
 
             if not hasattr(viewer, "pessoa_presente"):
                 viewer.pessoa_presente = False

@@ -63,7 +63,8 @@ class CameraThread(QThread):
             if self.stream_type == "GStreamer":
                 gst = (
                     f"rtspsrc location={self.url} latency=0 ! "
-                    "rtph264depay ! avdec_h264 ! videoconvert ! appsink sync=false"
+                    "rtph264depay ! avdec_h264 ! videoconvert ! "
+                    "appsink sync=false drop=true max-buffers=1"
                 )
                 cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
             elif self.stream_type == "OpenCV":
