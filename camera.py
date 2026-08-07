@@ -1,4 +1,5 @@
 import cv2
+import time
 
 from qtcompat import (
     QImage,
@@ -31,8 +32,11 @@ class CameraThread(QThread):
             self.stopped.emit()
             return
 
-        read_falhas = 0
+            read_falhas = 0
         max_falhas = 4
+        fps_limit = 25
+        min_interval = 1.0 / fps_limit
+        last_emit = 0.0
         while self.running:
             if self.cap is None or not self.cap.isOpened():
                 break
@@ -49,6 +53,12 @@ class CameraThread(QThread):
                     break
                 continue
             read_falhas = 0
+            # Limita a emissao p/ nao afogar a event loop da UI quando a
+            # camera glitcha e entrega frames mais rapido que o normal.
+            agora = time.time()
+            if agora - last_emit < min_interval:
+                continue
+            last_emit = agora
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb.shape
             bytesPerLine = ch * w
