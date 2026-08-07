@@ -59,6 +59,10 @@ class CameraViewer(QLabel):
         self.connecting = False
         self.disabled = False
         self._overlay = None
+        self._sound_badge = None
+        self._person_badge = None
+        self._init_badges()
+        self.update_badges()
         self.init_capture()
 
     def _create_overlay(self):
@@ -87,6 +91,53 @@ class CameraViewer(QLabel):
         ov.hide()
         return ov
 
+    def _init_badges(self):
+        self._sound_badge = QLabel(self)
+        self._person_badge = QLabel(self)
+        for lbl in (self._sound_badge, self._person_badge):
+            lbl.hide()
+
+    def _badge_style(self, ativo):
+        return (
+            "background-color: rgba(0,0,0,160); border-radius: 5px;"
+            "padding: 0px 5px; font-size: 15px; color: "
+            + ("#7CFC00" if ativo else "#888888")
+            + ";"
+        )
+
+    def update_badges(self):
+        if self._sound_badge is None:
+            return
+        som = bool(getattr(self, "alarm_on_detect", False))
+        pessoa = bool(getattr(self, "detect_person", False))
+        self._sound_badge.setText("🔊" if som else "🔇")
+        self._sound_badge.setToolTip(
+            f"Som {'ativado' if som else 'desativado'}"
+        )
+        self._sound_badge.setStyleSheet(self._badge_style(som))
+        self._sound_badge.show()
+        self._person_badge.setText("👤" if pessoa else "🚶")
+        self._person_badge.setToolTip(
+            f"Detecção de pessoas {'ativada' if pessoa else 'desativada'}"
+        )
+        self._person_badge.setStyleSheet(self._badge_style(pessoa))
+        self._person_badge.show()
+        self._layout_badges()
+
+    def _layout_badges(self):
+        if self._sound_badge is None:
+            return
+        m = 6
+        alt = 20
+        p = self._person_badge.sizeHint().width()
+        s = self._sound_badge.sizeHint().width()
+        self._person_badge.setGeometry(
+            self.width() - m - p, self.height() - m - alt, p, alt
+        )
+        self._sound_badge.setGeometry(
+            self.width() - m - p - m - s, self.height() - m - alt, s, alt
+        )
+
     def set_problem(self, motivo):
         if self.disabled:
             return
@@ -112,6 +163,7 @@ class CameraViewer(QLabel):
         super().resizeEvent(event)
         if self._overlay is not None:
             self._overlay.setGeometry(0, 0, self.width(), self.height())
+        self._layout_badges()
 
     def init_capture(self):
         self.connecting = True

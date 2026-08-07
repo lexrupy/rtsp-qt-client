@@ -699,6 +699,8 @@ class MosaicoRTSP(QWidget):
                 viewer.detect_person = detect_person
                 viewer.alarm_on_detect = alarm_on_detect
                 viewer.alarm_type = alarm_type
+                if hasattr(viewer, "update_badges"):
+                    viewer.update_badges()
                 if viewer.disabled != disabled:
                     viewer.set_disabled(disabled)
                 if not disabled and viewer.current_url != cam_url:
