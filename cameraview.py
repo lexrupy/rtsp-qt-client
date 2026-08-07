@@ -8,6 +8,7 @@ from qtcompat import (
     QWidget,
     QPushButton,
     QVBoxLayout,
+    pyqtSignal,
     QSizePolicy_Expanding,
     Qt_AlignmentFlag_AlignCenter,
     Qt_AspectRatioMode_KeepAspectRatio,
@@ -21,6 +22,13 @@ from camera import CameraThread, READ_TIMEOUT_MSEC
 
 
 THREAD_STOP_TIMEOUT = READ_TIMEOUT_MSEC + 5000
+
+
+class _Badge(QLabel):
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event):
+        self.clicked.emit()
 
 
 class CameraViewer(QLabel):
@@ -92,8 +100,10 @@ class CameraViewer(QLabel):
         return ov
 
     def _init_badges(self):
-        self._sound_badge = QLabel(self)
-        self._person_badge = QLabel(self)
+        self._sound_badge = _Badge(self)
+        self._person_badge = _Badge(self)
+        self._sound_badge.clicked.connect(self.toggle_som)
+        self._person_badge.clicked.connect(self.toggle_detecao)
         for lbl in (self._sound_badge, self._person_badge):
             lbl.hide()
 
@@ -137,6 +147,26 @@ class CameraViewer(QLabel):
         self._sound_badge.setGeometry(
             self.width() - m - p - m - s, self.height() - m - alt, s, alt
         )
+
+    def toggle_som(self):
+        self.alarm_on_detect = not self.alarm_on_detect
+        self._notify_toggle("alarm_on_detect", self.alarm_on_detect)
+        self.update_badges()
+
+    def toggle_detecao(self):
+        self.detect_person = not self.detect_person
+        self._notify_toggle("detect_person", self.detect_person)
+        self.update_badges()
+
+    def _notify_toggle(self, key, value):
+        parent = self.parent()
+        handler = getattr(parent, "on_camera_toggle", None)
+        if handler:
+            handler(self.camera_id, key, value)
+        else:
+            save = getattr(parent, "_schedule_save", None)
+            if save:
+                save()
 
     def set_problem(self, motivo):
         if self.disabled:

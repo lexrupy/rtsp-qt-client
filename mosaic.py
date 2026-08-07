@@ -525,6 +525,12 @@ class MosaicoRTSP(QWidget):
         menu.addAction(exit_action)
         menu.exec(event.globalPos())
 
+    def on_camera_toggle(self, cam_id, key, value):
+        cam = next((c for c in self.cameras if c["id"] == cam_id), None)
+        if cam:
+            cam[key] = value
+            self._schedule_save()
+
     def on_camera_disabled(self, cam_id, state):
         cam_data = next((c for c in self.cameras if c["id"] == cam_id), None)
         if cam_data:
